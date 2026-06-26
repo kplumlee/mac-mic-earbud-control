@@ -135,6 +135,26 @@ final class AppModel: ObservableObject {
         return result.sorted()
     }
 
+    // MARK: - Output settings
+
+    var autoSwitchOutputToBluetooth: Bool {
+        get { settings.autoSwitchOutputToBluetooth }
+        set { settings.autoSwitchOutputToBluetooth = newValue; onChange() }
+    }
+
+    var preferredOutputName: String? {
+        get { settings.preferredOutputName }
+        set { settings.preferredOutputName = newValue; onChange() }
+    }
+
+    /// Deduped, sorted names of all current devices that have an output stream.
+    func outputDeviceNames() -> [String] {
+        var seen = Set<String>()
+        return devices.filter { $0.hasOutput }.compactMap { device in
+            seen.insert(device.name).inserted ? device.name : nil
+        }.sorted()
+    }
+
     // MARK: - Call-app settings
 
     var callAppsOnly: Bool {

@@ -16,6 +16,7 @@ struct PopoverView: View {
                 }
 
                 DevicesSection(model: model)
+                OutputSection(model: model)
                 MeetingAutomationSection(model: model)
                 CallAppsSection(model: model)
                 FooterSection(model: model)
@@ -456,6 +457,59 @@ private struct MicPriorityRow: View {
             }
         }
         .padding(.vertical, 3)
+    }
+}
+
+// MARK: - Output Section
+
+private struct OutputSection: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        SectionCard(title: "Output") {
+            VStack(spacing: 0) {
+                ToggleRow(
+                    icon: "hifispeaker",
+                    label: "Always switch output to Bluetooth headphones on connect",
+                    isOn: Binding(
+                        get: { model.autoSwitchOutputToBluetooth },
+                        set: { model.autoSwitchOutputToBluetooth = $0 }
+                    )
+                )
+
+                Divider().padding(.leading, 28)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20)
+
+                    Text("When disconnected, switch back to:")
+                        .font(.subheadline)
+                        .lineLimit(1)
+
+                    Spacer()
+
+                    Picker(
+                        "",
+                        selection: Binding<String?>(
+                            get: { model.preferredOutputName },
+                            set: { model.preferredOutputName = $0 }
+                        )
+                    ) {
+                        Text("Leave to macOS").tag(String?(nil))
+                        ForEach(model.outputDeviceNames(), id: \.self) { name in
+                            Text(name).tag(String?(name))
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .controlSize(.small)
+                }
+                .padding(.vertical, 6)
+            }
+        }
     }
 }
 
