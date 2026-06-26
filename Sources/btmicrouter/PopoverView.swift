@@ -19,6 +19,7 @@ struct PopoverView: View {
                 OutputSection(model: model)
                 MicrophoneSection(model: model)
                 MeetingAutomationSection(model: model)
+                CalendarSection(model: model)
                 CallAppsSection(model: model)
                 FooterSection(model: model)
             }
@@ -703,6 +704,102 @@ private struct ZoomHelpRow: View {
             Spacer()
         }
         .padding(.vertical, 6)
+    }
+}
+
+// MARK: - Calendar Section
+
+private struct CalendarSection: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        SectionCard(title: "Calendar") {
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ToggleRow(
+                        icon: "calendar",
+                        label: "Calendar pre-launch",
+                        isOn: Binding(
+                            get: { model.calendarPrelaunchEnabled },
+                            set: { model.calendarPrelaunchEnabled = $0 }
+                        )
+                    )
+                    if model.calendarPrelaunchEnabled {
+                        Text("Opens your notes app + join link before each meeting. Uses your macOS calendars (iCloud, Google, Microsoft 365).")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 28)
+                            .padding(.bottom, 6)
+                    }
+                }
+
+                if model.calendarPrelaunchEnabled, let title = model.nextMeetingTitle {
+                    Divider().padding(.leading, 28)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.clock")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(title)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                            if let start = model.nextMeetingStart {
+                                TimelineView(.periodic(from: .now, by: 30)) { _ in
+                                    Text(relativeTime(from: start))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        if model.nextMeetingHasLink {
+                            Button {
+                                model.openNextMeeting()
+                            } label: {
+                                Label("Join", systemImage: "video")
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(.accentColor)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                }
+
+                if model.calendarPrelaunchEnabled {
+                    Divider().padding(.leading, 28)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 20)
+
+                        Stepper(
+                            "Pre-launch \(model.calendarLeadMinutes) min before",
+                            value: Binding(
+                                get: { model.calendarLeadMinutes },
+                                set: { model.calendarLeadMinutes = $0 }
+                            ),
+                            in: 0...15
+                        )
+                        .font(.subheadline)
+                    }
+                    .padding(.vertical, 6)
+                }
+            }
+        }
+    }
+
+    private func relativeTime(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: .now)
     }
 }
 

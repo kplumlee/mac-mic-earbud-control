@@ -21,6 +21,13 @@ final class AppModel: ObservableObject {
     @Published var inputMuted = false
     @Published var micInUse = false
 
+    // MARK: - Calendar state (pushed by AppDelegate via setNextMeeting)
+
+    @Published var nextMeetingTitle: String?
+    @Published var nextMeetingStart: Date?
+    @Published var nextMeetingHasLink: Bool = false
+    private var nextMeetingJoinURL: URL?
+
     // MARK: - Dependencies
 
     private let settings: Settings
@@ -227,6 +234,30 @@ final class AppModel: ObservableObject {
         guard !settings.launchAppsOnMeeting.contains(app) else { return }
         settings.launchAppsOnMeeting = settings.launchAppsOnMeeting + [app]
         onChange()
+    }
+
+    // MARK: - Calendar pre-launch settings
+
+    var calendarPrelaunchEnabled: Bool {
+        get { settings.calendarPrelaunchEnabled }
+        set { settings.calendarPrelaunchEnabled = newValue; onChange() }
+    }
+
+    var calendarLeadMinutes: Int {
+        get { settings.calendarLeadMinutes }
+        set { settings.calendarLeadMinutes = max(0, newValue); onChange() }
+    }
+
+    func setNextMeeting(title: String?, start: Date?, joinURL: URL?) {
+        nextMeetingTitle = title
+        nextMeetingStart = start
+        nextMeetingHasLink = (joinURL != nil)
+        nextMeetingJoinURL = joinURL
+    }
+
+    func openNextMeeting() {
+        guard let url = nextMeetingJoinURL else { return }
+        NSWorkspace.shared.open(url)
     }
 
     /// Deduped, sorted localized names of all running applications.

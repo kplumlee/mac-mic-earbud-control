@@ -22,6 +22,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Mute hotkey
     private var muteHotKey: GlobalHotKey?
 
+    // Calendar pre-launch state
+    private let calendar = CalendarService()
+    private var lastPrelaunchedStart: Date?
+    private var calendarAccessGranted = false
+
     // Output management state
     // Seeded in applicationDidFinishLaunching before the first apply() so the
     // "appeared" diff on the very first run is empty — preventing us from
@@ -54,10 +59,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         previousDevices = manager.allDevices()
         updateMuteHotKeyRegistration()
         apply()
+        requestCalendarAccessIfNeeded()
 
         meetingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.evaluateMeeting()
             self?.pushState()
+            self?.checkCalendar()
         }
     }
 
@@ -140,6 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         pushState()
         updateMuteHotKeyRegistration()
+        requestCalendarAccessIfNeeded()
     }
 
     /// Diff the current device list against the previous one and apply output
@@ -212,6 +220,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 inputMuted: muted,
                 micInUse: micHot)
             statusItemController.updateIcon(meeting: met, routing: routing, paused: paused, muted: muted, micHot: micHot)
+        }
+    }
+
+    // MARK: - Calendar
+
+    private func requestCalendarAccessIfNeeded() {
+        guard settings.calendarPrelaunchEnabled, !calendarAccessGranted else { return }
+        calendar.requestAccess { [weak self] granted in
+            DispatchQueue.main.async {
+                self?.calendarAccessGranted = granted
+                self?.pushState()
+            }
+        }
+    }
+
+    private func checkCalendar() {
+        guard settings.calendarPrelaunchEnabled, calendarAccessGranted else {
+            MainActor.assumeIsolated {
+                model.setNextMeeting(title: nil, start: nil, joinURL: nil)
+            }
+            return
+        }
+        let meeting = calendar.nextMeeting(within: 12)
+        MainActor.assumeIsolated {
+            model.setNextMeeting(
+                title: meeting?.title,
+                start: meeting?.start,
+                joinURL: meeting?.joinURL)
+        }
+        guard let meeting = meeting else { return }
+        let timeUntil = meeting.start.timeIntervalSinceNow
+        guard timeUntil <= Double(settings.calendarLeadMinutes) * 60,
+              timeUntil > -60,
+              lastPrelaunchedStart != meeting.start else { return }
+        lastPrelaunchedStart = meeting.start
+        for name in settings.launchAppsOnMeeting {
+            launchApp(name)
+        }
+        if let url = meeting.joinURL {
+            NSWorkspace.shared.open(url)
         }
     }
 
