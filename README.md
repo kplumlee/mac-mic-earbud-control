@@ -26,6 +26,13 @@ mv BTMicRouter.app ~/Applications/
 open ~/Applications/BTMicRouter.app
 ```
 
+After pulling changes, rebuild and reinstall:
+```
+./scripts/build-app.sh
+mv BTMicRouter.app ~/Applications/
+```
+then quit and reopen the app.
+
 The app lives in the menu bar (🎙️). There is no Dock icon (`LSUIElement=true`).
 
 > **Note on signing:** the script uses ad-hoc code signing (`codesign -s -`),
@@ -66,13 +73,22 @@ that stable path; effective next login).
   applications (Zoom, Teams, FaceTime, etc.), leaving other apps undisturbed.
   Per-app rules trigger when a configured call app is running (not necessarily frontmost).
 
-## Usage
+## User Interface
 
-- Click the 🎙️ menu-bar icon.
-- Check the Bluetooth devices to manage (AirPods are auto-excluded).
-- Mic priority is `Lumina Camera - Raw` → `PlumDog Microphone` →
-  `EarPods Microphone`; the first one present is used.
-- Pause / Resume and Fix input now are in the menu.
+The app runs in the macOS menu bar with a polished **SwiftUI popover** — click the menu-bar mic icon to open it.
+
+**Menu-bar icon states** (SF Symbols):
+- `mic` — idle (no routing active)
+- `mic.fill` — routing active (input redirected to priority mic)
+- `record.circle` (red) — in a meeting
+- `pause.circle` — paused / automation suspended
+
+**Popover sections:**
+- **Live status** — current microphone and sample-rate quality (✅ high quality ≥24 kHz, or ⚠️ degraded)
+- **Output devices** — each managed Bluetooth headset with per-device mic-priority editor
+- **Meeting automation** — enable/disable, launch apps, pause music
+- **Per-app rules** — restrict switching to call apps (Zoom, Teams, FaceTime, etc.)
+- **Footer** — Launch at login toggle, Quit button
 
 ## Meeting automation
 
@@ -99,6 +115,17 @@ an active meeting and automatically:
 | Meeting automation | Master toggle — enable/disable all automation |
 | Launch apps on meeting | Comma-separated list of app names to open at start |
 | Pause music on meeting | Toggle music pause/resume behaviour |
+
+### Recording backstop
+
+When a meeting is detected, the app sends a **🔴 "Meeting started — Recording? Don't forget"** notification (toggle: "Remind me to record" in the menu) and shows a dismissible reminder banner in the popover during the meeting.
+
+**Important:** The app **cannot reliably press "Record"** in Zoom, Teams, or Google Meet — those record buttons are inside the app and permission-gated. The **reliable ways to never miss a recording** are:
+
+1. **Zoom's native auto-record** — Enable "Automatically record meeting" in Zoom's settings. The popover has a "Turn on Zoom auto-record…" link that opens Zoom's help page for this setting.
+2. **Granola + Google Calendar** — Link Granola to your Google Calendar; it auto-transcribes scheduled meetings and auto-launches when you join.
+
+You can auto-launch Granola (or other apps) on meeting start via the **Launch apps on meeting** list, but launching the app ≠ recording — Granola only starts capturing when you open a note or join a calendar-linked meeting.
 
 ### First-run permission prompt
 
