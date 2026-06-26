@@ -41,14 +41,17 @@ final class StatusMenuController: NSObject {
                                       action: #selector(toggleManaged(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = dev.name
-                item.state = settings.managedNames.contains(dev.name) ? .on : .off
+                // TODO: per-device profile UI to be wired up in a later task
+                item.state = settings.profile(for: dev.name).managed ? .on : .off
                 menu.addItem(item)
             }
         }
         menu.addItem(.separator())
 
         menu.addItem(disabledItem("Mic priority"))
-        for (idx, mic) in settings.micPriority.enumerated() {
+        // TODO: per-device mic priority UI to be wired up in a later task;
+        // show global default priority for now
+        for (idx, mic) in Settings.defaultPriority.enumerated() {
             let present = devices.contains { $0.name == mic && $0.hasInput }
             let mark = present ? "●" : "○"
             menu.addItem(disabledItem("  \(idx + 1). \(mark) \(mic)"))
@@ -91,10 +94,14 @@ final class StatusMenuController: NSObject {
     private func isRoutingActive(devices: [AudioDeviceInfo]) -> Bool {
         guard let outID = manager.defaultOutputDevice(),
               let out = devices.first(where: { $0.id == outID }) else { return false }
+        // TODO: wire up frontmostBundleID in a later task
         let decision = RoutingPolicy.decide(
             activeOutput: out, devices: devices,
-            managedNames: settings.managedNames,
-            micPriority: settings.micPriority, paused: settings.paused)
+            profiles: settings.profiles,
+            paused: settings.paused,
+            frontmostBundleID: nil,
+            callAppsOnly: settings.callAppsOnly,
+            callApps: settings.callApps)
         if case .setInput = decision { return true }
         return false
     }
@@ -103,9 +110,12 @@ final class StatusMenuController: NSObject {
         if settings.paused { return "⏸ Paused" }
         guard let outID = manager.defaultOutputDevice(),
               let out = devices.first(where: { $0.id == outID }) else { return "Idle" }
+        let outProfile = settings.profile(for: out.name)
         guard out.transport == .bluetooth, !isAirPods(out.name),
-              settings.managedNames.contains(out.name) else { return "Idle" }
-        for mic in settings.micPriority where devices.contains(where: { $0.name == mic && $0.hasInput }) {
+              outProfile.managed else { return "Idle" }
+        let priority = outProfile.micPriority.isEmpty
+            ? Settings.defaultPriority : outProfile.micPriority
+        for mic in priority where devices.contains(where: { $0.name == mic && $0.hasInput }) {
             return "✅ \(out.name) → \(mic)"
         }
         return "⚠️ \(out.name): no fallback mic available"
@@ -119,9 +129,10 @@ final class StatusMenuController: NSObject {
 
     @objc private func toggleManaged(_ sender: NSMenuItem) {
         guard let name = sender.representedObject as? String else { return }
-        var managed = settings.managedNames
-        if managed.contains(name) { managed.remove(name) } else { managed.insert(name) }
-        settings.managedNames = managed
+        // TODO: full per-device profile UI to be wired up in a later task
+        var profile = settings.profile(for: name)
+        profile.managed.toggle()
+        settings.setProfile(profile, for: name)
         onUserChange()
     }
 

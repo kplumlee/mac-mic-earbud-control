@@ -13,59 +13,142 @@ final class RoutingPolicyTests: XCTestCase {
     let plumdog = AudioDeviceInfo(id: 11, name: "PlumDog Microphone",
                                   transport: .other, hasOutput: false, hasInput: true)
 
-    let priority = ["Lumina Camera - Raw", "PlumDog Microphone", "EarPods Microphone"]
+    // Helper: build a profiles dict with the given names marked managed, using defaultPriority
+    private func profiles(managed names: [String],
+                          priority: [String]? = nil) -> [String: DeviceProfile] {
+        var map: [String: DeviceProfile] = [:]
+        for name in names {
+            map[name] = DeviceProfile(managed: true,
+                                      micPriority: priority ?? Settings.defaultPriority)
+        }
+        return map
+    }
+
+    // MARK: - Ported existing tests
 
     func testManagedBluetoothOutputRoutesToLumina() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina, plumdog],
-            managedNames: ["HUAWEI FreeClip 2"], micPriority: priority, paused: false)
+            profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
+            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .setInput(10))
     }
 
     func testFallsBackWhenLuminaAbsent() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, plumdog],
-            managedNames: ["HUAWEI FreeClip 2"], micPriority: priority, paused: false)
+            profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
+            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .setInput(11))
     }
 
     func testLeavesAloneWhenNoPriorityMicPresent() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei],
-            managedNames: ["HUAWEI FreeClip 2"], micPriority: priority, paused: false)
+            profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
+            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
     func testUnmanagedBluetoothLeavesAlone() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina],
-            managedNames: [], micPriority: priority, paused: false)
+            profiles: [:], // empty = not managed
+            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
     func testAirPodsLeftAloneEvenIfManaged() {
         let d = RoutingPolicy.decide(
             activeOutput: airpods, devices: [airpods, lumina],
-            managedNames: ["AirPods Pro"], micPriority: priority, paused: false)
+            profiles: profiles(managed: ["AirPods Pro"]),
+            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
     func testNonBluetoothOutputLeavesAlone() {
         let d = RoutingPolicy.decide(
             activeOutput: speakers, devices: [speakers, lumina],
-            managedNames: ["Mac Studio Speakers"], micPriority: priority, paused: false)
+            profiles: profiles(managed: ["Mac Studio Speakers"]),
+            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
     func testPausedLeavesAlone() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina],
-            managedNames: ["HUAWEI FreeClip 2"], micPriority: priority, paused: true)
+            profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
+            paused: true, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
     func testManagedCandidatesExcludeAirPodsAndNonBluetooth() {
         let c = RoutingPolicy.managedCandidates(devices: [huawei, airpods, speakers, lumina])
         XCTAssertEqual(c.map(\.name), ["HUAWEI FreeClip 2"])
+    }
+
+    // MARK: - Per-app gating tests
+
+    func testCallAppsOnlyBlocksWhenFrontmostNil() {
+        let d = RoutingPolicy.decide(
+            activeOutput: huawei, devices: [huawei, lumina],
+            profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
+            paused: false, frontmostBundleID: nil,
+            callAppsOnly: true, callApps: ["us.zoom.xos"])
+        XCTAssertEqual(d, .leaveAlone)
+    }
+
+    func testCallAppsOnlyBlocksWhenFrontmostNotInList() {
+        let d = RoutingPolicy.decide(
+            activeOutput: huawei, devices: [huawei, lumina],
+            profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
+            paused: false, frontmostBundleID: "com.apple.Safari",
+            callAppsOnly: true, callApps: ["us.zoom.xos"])
+        XCTAssertEqual(d, .leaveAlone)
+    }
+
+    func testCallAppsOnlyAllowsWhenFrontmostInList() {
+        let d = RoutingPolicy.decide(
+            activeOutput: huawei, devices: [huawei, lumina],
+            profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
+            paused: false, frontmostBundleID: "us.zoom.xos",
+            callAppsOnly: true, callApps: ["us.zoom.xos"])
+        XCTAssertEqual(d, .setInput(10))
+    }
+
+    func testCallAppsOnlyFalseAllowsAnyApp() {
+        let d = RoutingPolicy.decide(
+            activeOutput: huawei, devices: [huawei, lumina],
+            profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
+            paused: false, frontmostBundleID: "com.apple.Safari",
+            callAppsOnly: false, callApps: [])
+        XCTAssertEqual(d, .setInput(10))
+    }
+
+    // MARK: - Per-device profile micPriority tests
+
+    func testPerDeviceProfileMicPriority() {
+        // DeviceA prefers PlumDog first; DeviceB prefers Lumina first
+        let deviceA = AudioDeviceInfo(id: 20, name: "DeviceA",
+                                      transport: .bluetooth, hasOutput: true, hasInput: false)
+        let deviceB = AudioDeviceInfo(id: 21, name: "DeviceB",
+                                      transport: .bluetooth, hasOutput: true, hasInput: false)
+        var p: [String: DeviceProfile] = [:]
+        p["DeviceA"] = DeviceProfile(managed: true,
+                                     micPriority: ["PlumDog Microphone", "Lumina Camera - Raw"])
+        p["DeviceB"] = DeviceProfile(managed: true,
+                                     micPriority: ["Lumina Camera - Raw", "PlumDog Microphone"])
+
+        let dA = RoutingPolicy.decide(
+            activeOutput: deviceA, devices: [deviceA, lumina, plumdog],
+            profiles: p,
+            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+        XCTAssertEqual(dA, .setInput(11)) // PlumDog wins for DeviceA
+
+        let dB = RoutingPolicy.decide(
+            activeOutput: deviceB, devices: [deviceB, lumina, plumdog],
+            profiles: p,
+            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+        XCTAssertEqual(dB, .setInput(10)) // Lumina wins for DeviceB
     }
 }

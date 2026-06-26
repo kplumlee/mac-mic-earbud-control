@@ -10,22 +10,63 @@ final class SettingsTests: XCTestCase {
 
     func testDefaultsWhenUnset() {
         let s = freshSettings()
-        XCTAssertEqual(s.managedNames, [])
-        XCTAssertEqual(s.micPriority, Settings.defaultPriority)
+        XCTAssertEqual(s.profiles, [:])
+        XCTAssertFalse(s.callAppsOnly)
+        XCTAssertEqual(s.callApps, [
+            "us.zoom.xos",
+            "com.microsoft.teams2",
+            "com.microsoft.teams",
+            "com.apple.FaceTime",
+            "com.google.Chrome",
+            "com.cisco.webexmeetingsapp",
+            "com.hnc.Discord",
+            "com.tinyspeck.slackmacgap",
+        ])
         XCTAssertFalse(s.paused)
     }
 
-    func testRoundTripsManagedNames() {
+    func testProfileForReturnsDefaultForUnknownDevice() {
         let s = freshSettings()
-        s.managedNames = ["HUAWEI FreeClip 2", "BoomAudio"]
-        XCTAssertEqual(s.managedNames, ["HUAWEI FreeClip 2", "BoomAudio"])
+        let p = s.profile(for: "SomeUnknownHeadset")
+        XCTAssertEqual(p, DeviceProfile(managed: false, micPriority: Settings.defaultPriority))
     }
 
-    func testRoundTripsPriorityAndPaused() {
+    func testSetProfileAndProfileFor() {
         let s = freshSettings()
-        s.micPriority = ["PlumDog Microphone", "Lumina Camera - Raw"]
+        let profile = DeviceProfile(managed: true, micPriority: ["PlumDog Microphone"])
+        s.setProfile(profile, for: "HUAWEI FreeClip 2")
+        XCTAssertEqual(s.profile(for: "HUAWEI FreeClip 2"), profile)
+    }
+
+    func testProfilesJSONRoundTrip() {
+        let s = freshSettings()
+        let profile1 = DeviceProfile(managed: true, micPriority: ["Lumina Camera - Raw"])
+        let profile2 = DeviceProfile(managed: false, micPriority: ["PlumDog Microphone", "EarPods Microphone"])
+        s.setProfile(profile1, for: "HeadsetA")
+        s.setProfile(profile2, for: "HeadsetB")
+
+        XCTAssertEqual(s.profiles["HeadsetA"], profile1)
+        XCTAssertEqual(s.profiles["HeadsetB"], profile2)
+        XCTAssertEqual(s.profiles.count, 2)
+    }
+
+    func testCallAppsOnlyRoundTrip() {
+        let s = freshSettings()
+        XCTAssertFalse(s.callAppsOnly)
+        s.callAppsOnly = true
+        XCTAssertTrue(s.callAppsOnly)
+    }
+
+    func testCallAppsRoundTrip() {
+        let s = freshSettings()
+        let custom = ["com.custom.app1", "com.custom.app2"]
+        s.callApps = custom
+        XCTAssertEqual(s.callApps, custom)
+    }
+
+    func testPausedRoundTrip() {
+        let s = freshSettings()
         s.paused = true
-        XCTAssertEqual(s.micPriority, ["PlumDog Microphone", "Lumina Camera - Raw"])
         XCTAssertTrue(s.paused)
     }
 }

@@ -37,12 +37,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let activeOutput = manager.defaultOutputDevice().flatMap { id in
             devices.first { $0.id == id }
         }
+        // TODO: wire up frontmostBundleID in a later task
         let decision = RoutingPolicy.decide(
             activeOutput: activeOutput,
             devices: devices,
-            managedNames: settings.managedNames,
-            micPriority: settings.micPriority,
-            paused: settings.paused)
+            profiles: settings.profiles,
+            paused: settings.paused,
+            frontmostBundleID: nil,
+            callAppsOnly: settings.callAppsOnly,
+            callApps: settings.callApps)
 
         switch decision {
         case .leaveAlone:
