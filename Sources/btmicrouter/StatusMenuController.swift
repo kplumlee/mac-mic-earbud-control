@@ -8,6 +8,15 @@ final class StatusMenuController: NSObject {
     private let onUserChange: () -> Void
     private let onFixNow: () -> Void
 
+    private var meetingActive = false
+    private var meetingSince: Date?
+
+    private static let meetingTimeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
     init(settings: Settings, manager: AudioDeviceManager,
          onUserChange: @escaping () -> Void, onFixNow: @escaping () -> Void) {
         self.settings = settings
@@ -19,12 +28,27 @@ final class StatusMenuController: NSObject {
         refreshMenu(devices: manager.allDevices())
     }
 
+    func updateMeeting(active: Bool, since: Date?) {
+        meetingActive = active
+        meetingSince = since
+        refreshMenu(devices: manager.allDevices())
+    }
+
     func refreshMenu(devices: [AudioDeviceInfo]) {
         updateIcon(devices: devices)
 
         let menu = NSMenu()
 
         // Status line / quality readout (no action — disabled header)
+        if meetingActive {
+            let sinceStr: String
+            if let since = meetingSince {
+                sinceStr = " (since \(StatusMenuController.meetingTimeFormatter.string(from: since)))"
+            } else {
+                sinceStr = ""
+            }
+            menu.addItem(disabledItem("🔴 In a meeting\(sinceStr)"))
+        }
         menu.addItem(disabledItem(statusLine(devices: devices)))
         menu.addItem(.separator())
 
@@ -160,6 +184,70 @@ final class StatusMenuController: NSObject {
 
         menu.addItem(.separator())
 
+        // Meeting automation section
+        menu.addItem(disabledItem("Meeting automation"))
+
+        let meetingAutoItem = NSMenuItem(title: "Meeting automation",
+                                         action: #selector(toggleMeetingAutomation), keyEquivalent: "")
+        meetingAutoItem.target = self
+        meetingAutoItem.state = settings.meetingAutomationEnabled ? .on : .off
+        menu.addItem(meetingAutoItem)
+
+        // "Launch on meeting" submenu
+        let launchParent = NSMenuItem(title: "Launch on meeting", action: nil, keyEquivalent: "")
+        let launchSubMenu = NSMenu(title: "")
+
+        for appName in settings.launchAppsOnMeeting {
+            let removeItem = NSMenuItem(title: appName,
+                                        action: #selector(removeLaunchApp(_:)), keyEquivalent: "")
+            removeItem.target = self
+            removeItem.representedObject = appName
+            removeItem.state = .on
+            launchSubMenu.addItem(removeItem)
+        }
+
+        launchSubMenu.addItem(.separator())
+
+        // "Add running app" sub-submenu
+        let addRunningParent = NSMenuItem(title: "Add running app", action: nil, keyEquivalent: "")
+        let addRunningSubMenu = NSMenu(title: "")
+
+        let alreadyAdded = Set(settings.launchAppsOnMeeting)
+        var seenNames = Set<String>()
+        let addableApps = NSWorkspace.shared.runningApplications
+            .compactMap { $0.localizedName }
+            .filter { name in
+                guard !alreadyAdded.contains(name), !seenNames.contains(name) else { return false }
+                seenNames.insert(name)
+                return true
+            }
+            .sorted()
+
+        if addableApps.isEmpty {
+            addRunningSubMenu.addItem(disabledItem("(none)"))
+        } else {
+            for appName in addableApps {
+                let addItem = NSMenuItem(title: appName,
+                                         action: #selector(addLaunchApp(_:)), keyEquivalent: "")
+                addItem.target = self
+                addItem.representedObject = appName
+                addRunningSubMenu.addItem(addItem)
+            }
+        }
+        addRunningParent.submenu = addRunningSubMenu
+        launchSubMenu.addItem(addRunningParent)
+
+        launchParent.submenu = launchSubMenu
+        menu.addItem(launchParent)
+
+        let pauseMusicItem = NSMenuItem(title: "Pause music in meetings",
+                                         action: #selector(togglePauseMusic), keyEquivalent: "")
+        pauseMusicItem.target = self
+        pauseMusicItem.state = settings.pauseMusicOnMeeting ? .on : .off
+        menu.addItem(pauseMusicItem)
+
+        menu.addItem(.separator())
+
         let pause = NSMenuItem(title: settings.paused ? "Resume" : "Pause",
                                action: #selector(togglePause), keyEquivalent: "")
         pause.target = self
@@ -186,7 +274,9 @@ final class StatusMenuController: NSObject {
     // MARK: - Icon + status line
 
     private func updateIcon(devices: [AudioDeviceInfo]) {
-        if settings.paused {
+        if meetingActive {
+            statusItem.button?.title = "🔴"
+        } else if settings.paused {
             statusItem.button?.title = "⏸"
         } else if isRoutingActive(devices: devices) {
             statusItem.button?.title = "🎙️✅"
@@ -312,6 +402,34 @@ final class StatusMenuController: NSObject {
             settings.callApps = apps
             onUserChange()
         }
+    }
+
+    @objc private func toggleMeetingAutomation() {
+        settings.meetingAutomationEnabled.toggle()
+        onUserChange()
+    }
+
+    @objc private func removeLaunchApp(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        var apps = settings.launchAppsOnMeeting
+        apps.removeAll { $0 == name }
+        settings.launchAppsOnMeeting = apps
+        onUserChange()
+    }
+
+    @objc private func addLaunchApp(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        var apps = settings.launchAppsOnMeeting
+        if !apps.contains(name) {
+            apps.append(name)
+            settings.launchAppsOnMeeting = apps
+            onUserChange()
+        }
+    }
+
+    @objc private func togglePauseMusic() {
+        settings.pauseMusicOnMeeting.toggle()
+        onUserChange()
     }
 
     @objc private func togglePause() {
