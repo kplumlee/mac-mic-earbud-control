@@ -11,6 +11,7 @@ public final class Settings {
         static let meetingAutomationEnabled = "meetingAutomationEnabled"
         static let launchAppsOnMeeting = "launchAppsOnMeeting"
         static let pauseMusicOnMeeting = "pauseMusicOnMeeting"
+        static let recordReminderEnabled = "recordReminderEnabled"
     }
 
     public static let defaultPriority = [
@@ -84,5 +85,10 @@ public final class Settings {
     public var pauseMusicOnMeeting: Bool {
         get { defaults.object(forKey: Key.pauseMusicOnMeeting) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.pauseMusicOnMeeting) }
+    }
+
+    public var recordReminderEnabled: Bool {
+        get { defaults.object(forKey: Key.recordReminderEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.recordReminderEnabled) }
     }
 }

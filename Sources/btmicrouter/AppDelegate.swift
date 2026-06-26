@@ -148,6 +148,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         postMeetingNotification(launched: settings.launchAppsOnMeeting)
+        if settings.recordReminderEnabled {
+            postRecordReminder()
+        }
         menuController.updateMeeting(active: true, since: meetingStartedAt)
         appLog.info("meeting started")
     }
@@ -216,6 +219,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         return dispatched
+    }
+
+    private func postRecordReminder() {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "🔴 Meeting started"
+        content.body = "Recording? Don't forget to hit record."
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                appLog.error("record reminder notification error: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 
     private func postMeetingNotification(launched: [String]) {

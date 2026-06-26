@@ -103,4 +103,20 @@ final class SettingsTests: XCTestCase {
         s.pauseMusicOnMeeting = true
         XCTAssertTrue(s.pauseMusicOnMeeting)
     }
+
+    // MARK: - Record reminder setting
+
+    func testRecordReminderEnabledDefaultWhenUnset() {
+        let s = freshSettings()
+        XCTAssertTrue(s.recordReminderEnabled)
+    }
+
+    func testRecordReminderEnabledRoundTrip() {
+        let s = freshSettings()
+        XCTAssertTrue(s.recordReminderEnabled)
+        s.recordReminderEnabled = false
+        XCTAssertFalse(s.recordReminderEnabled)
+        s.recordReminderEnabled = true
+        XCTAssertTrue(s.recordReminderEnabled)
+    }
 }
