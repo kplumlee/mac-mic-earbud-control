@@ -38,13 +38,12 @@ Commit `feat: universal auto-best-mic selection; sample rate/channels in device 
 
 ### Task 24: Settings for output/mute/calendar (+ graceful DeviceProfile decode)
 
-**Files:** `Sources/RoutingCore/Settings.swift`, `Sources/RoutingCore/DeviceProfile.swift`, tests.
+**Files:** `Sources/RoutingCore/Settings.swift`, tests. (No `DeviceProfile` change — output switching is GLOBAL, not per-device.)
 
-- `DeviceProfile`: add `var manageOutput: Bool` (default false). Implement `init(from:)` using `decodeIfPresent` so OLD stored profiles (without the field) decode with `manageOutput = false` and `micPriority`/`managed` keep working. Keep `Codable, Equatable` and the memberwise init (with `manageOutput: Bool = false` default).
-- `Settings`: add `var preferredOutputName: String?` (string or nil), `var muteHotkeyEnabled: Bool` (default true), `var calendarPrelaunchEnabled: Bool` (default false), `var calendarLeadMinutes: Int` (default 1; `object(forKey:) as? Int ?? 1`). Add keys to the Key enum.
-- Tests: DeviceProfile round-trips with manageOutput; decoding a JSON blob WITHOUT manageOutput yields false (write a legacy-shaped JSON and decode it); the new Settings values' defaults + round-trips.
+- `Settings`: add `var autoSwitchOutputToBluetooth: Bool` (DEFAULT TRUE — use `object(forKey:) as? Bool ?? true`); `var preferredOutputName: String?` (the device to switch output back to on disconnect; nil = leave as-is); `var muteHotkeyEnabled: Bool` (default true, `?? true` pattern); `var calendarPrelaunchEnabled: Bool` (default false); `var calendarLeadMinutes: Int` (default 1; `object(forKey:) as? Int ?? 1`). Add keys to the Key enum.
+- Tests: each new setting's default-when-unset + round-trip (fresh `UserDefaults(suiteName:)` per test). For `preferredOutputName`: nil when unset, round-trips a string, and can be cleared back to nil.
 
-Commit `feat: settings for output management, mute hotkey, calendar`.
+Commit `feat: settings for output switching, mute hotkey, calendar`.
 
 ---
 
@@ -62,10 +61,13 @@ Commit `feat: settings for output management, mute hotkey, calendar`.
 
 **Files:** `Sources/btmicrouter/AppDelegate.swift`, `Sources/btmicrouter/AppModel.swift`, `Sources/btmicrouter/PopoverView.swift`.
 
-- AppDelegate: track the previous device-name set; in `apply()` (or a dedicated handler off the device-list listener), detect devices that just APPEARED. If an appeared device's profile has `manageOutput == true`, `manager.setDefaultOutputDevice(thatID)`. Detect a managed-output device that just DISAPPEARED while it was the default output → set output to `preferredOutputName`'s device if present, else leave. Keep it simple and debounced with the existing mechanism.
-- AppModel: `func isManageOutput(_ name: String) -> Bool` / `setManageOutput(_:_:)`; `var preferredOutputName: String? { get set }`; `func outputDeviceNames() -> [String]` (devices with `hasOutput`).
-- PopoverView: in each managed device's card, add a "Also switch audio output to this device" toggle; in the devices section add a "Fallback output when disconnected" `Picker` bound to `preferredOutputName` over `outputDeviceNames()` (plus a "System default" / none option).
-- Verify build + tests. Commit `feat: per-device output switching with fallback`.
+- AppDelegate: keep a `previousDeviceNames: Set<String>`. On each `apply()` (driven by the device-list listener, already debounced), diff against the new device set:
+  - **Appeared** Bluetooth output devices (`transport == .bluetooth && hasOutput && !isAirPods`): if `settings.autoSwitchOutputToBluetooth`, call `manager.setDefaultOutputDevice(thatID)` (set the connecting headphone as output). If several appeared, pick the first.
+  - **Disappeared** Bluetooth output device that was the current default output (i.e. the active output is now gone): if `settings.preferredOutputName` resolves to a present device, `manager.setDefaultOutputDevice(thatID)`; else leave macOS to choose.
+  Update `previousDeviceNames` at the end. This is purely additive to the existing input-routing in `apply()`.
+- AppModel: `var autoSwitchOutputToBluetooth: Bool { get set }` (write-through + onChange); `var preferredOutputName: String? { get set }`; `func outputDeviceNames() -> [String]` (current devices with `hasOutput`, deduped).
+- PopoverView: add an "Output" section (near the devices section): a toggle "Always switch output to Bluetooth headphones on connect" bound to `autoSwitchOutputToBluetooth`, and a `Picker` "When disconnected, switch back to:" bound to `preferredOutputName` over `outputDeviceNames()` with a leading "Leave to macOS" (nil) option.
+- Verify build + tests. Commit `feat: global output switching to Bluetooth with chosen fallback`.
 
 ---
 
