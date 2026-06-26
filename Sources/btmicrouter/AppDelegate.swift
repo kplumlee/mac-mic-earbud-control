@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import os
 import UserNotifications
 import RoutingCore
@@ -18,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var meetingStartedAt: Date?
     private var didPauseMusic = false
 
+    // Mute hotkey
+    private var muteHotKey: GlobalHotKey?
+
     // Output management state
     // Seeded in applicationDidFinishLaunching before the first apply() so the
     // "appeared" diff on the very first run is empty — preventing us from
@@ -26,7 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         MainActor.assumeIsolated {
-            model = AppModel(settings: settings, onChange: { [weak self] in self?.apply() }, fixNow: { [weak self] in self?.apply() })
+            model = AppModel(
+                settings: settings,
+                onChange: { [weak self] in self?.apply() },
+                fixNow: { [weak self] in self?.apply() },
+                muteAction: { [weak self] in self?.toggleMute() })
             statusItemController = StatusItemController(model: model)
         }
         manager.startListening { [weak self] in self?.scheduleApply() }
@@ -44,16 +52,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Seed previousDevices before the first apply() so the "appeared"
         // diff on launch is empty and we don't hijack the current output.
         previousDevices = manager.allDevices()
+        updateMuteHotKeyRegistration()
         apply()
 
         meetingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.evaluateMeeting()
+            self?.pushState()
         }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         if didPauseMusic { setMusicPlaying(true); didPauseMusic = false }
         meetingTimer?.invalidate()
+        muteHotKey?.unregister()
         manager.stopListening()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
@@ -128,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         pushState()
+        updateMuteHotKeyRegistration()
     }
 
     /// Diff the current device list against the previous one and apply output
@@ -186,6 +198,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let met = meetingActive
         let since = meetingStartedAt
         let paused = settings.paused
+        let muted = manager.isInputMuted()
+        let micHot = manager.isDefaultInputInUse()
         MainActor.assumeIsolated {
             model.refresh(
                 devices: devices,
@@ -194,8 +208,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 activeInputSampleRateKHz: kHz,
                 routingActive: routing,
                 meetingActive: met,
-                meetingSince: since)
-            statusItemController.updateIcon(meeting: met, routing: routing, paused: paused)
+                meetingSince: since,
+                inputMuted: muted,
+                micInUse: micHot)
+            statusItemController.updateIcon(meeting: met, routing: routing, paused: paused, muted: muted, micHot: micHot)
+        }
+    }
+
+    // MARK: - Mute
+
+    private func toggleMute() {
+        manager.setInputMuted(!manager.isInputMuted())
+        pushState()
+    }
+
+    private func updateMuteHotKeyRegistration() {
+        if settings.muteHotkeyEnabled && muteHotKey == nil {
+            muteHotKey = GlobalHotKey(
+                keyCode: 46,
+                modifiers: UInt32(cmdKey | optionKey | controlKey)
+            ) { [weak self] in self?.toggleMute() }
+        } else if !settings.muteHotkeyEnabled && muteHotKey != nil {
+            muteHotKey?.unregister()
+            muteHotKey = nil
         }
     }
 

@@ -17,6 +17,7 @@ struct PopoverView: View {
 
                 DevicesSection(model: model)
                 OutputSection(model: model)
+                MicrophoneSection(model: model)
                 MeetingAutomationSection(model: model)
                 CallAppsSection(model: model)
                 FooterSection(model: model)
@@ -508,6 +509,54 @@ private struct OutputSection: View {
                     .controlSize(.small)
                 }
                 .padding(.vertical, 6)
+            }
+        }
+    }
+}
+
+// MARK: - Microphone Section
+
+private struct MicrophoneSection: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        SectionCard(title: "Microphone") {
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: model.inputMuted ? "mic.slash" : "mic")
+                        .font(.subheadline)
+                        .foregroundStyle(model.inputMuted ? Color.red : Color.secondary)
+                        .frame(width: 20)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(model.inputMuted ? "Muted" : (model.micInUse ? "In use" : "Active"))
+                            .font(.subheadline)
+                        Text("Hotkey: \u{2303}\u{2325}\u{2318}M")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button(model.inputMuted ? "Unmute" : "Mute") {
+                        model.toggleMute()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(model.inputMuted ? nil : .red)
+                }
+                .padding(.vertical, 6)
+
+                Divider().padding(.leading, 28)
+
+                ToggleRow(
+                    icon: "keyboard",
+                    label: "Mute hotkey",
+                    isOn: Binding(
+                        get: { model.muteHotkeyEnabled },
+                        set: { model.muteHotkeyEnabled = $0 }
+                    )
+                )
             }
         }
     }

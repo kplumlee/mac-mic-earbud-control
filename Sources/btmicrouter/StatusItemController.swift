@@ -29,14 +29,30 @@ final class StatusItemController: NSObject {
     }
 
     // Update the menu-bar glyph + tint to reflect state.
-    func updateIcon(meeting: Bool, routing: Bool, paused: Bool) {
+    func updateIcon(meeting: Bool, routing: Bool, paused: Bool, muted: Bool, micHot: Bool) {
         guard let button = statusItem.button else { return }
         let symbol: String
-        if paused { symbol = "pause.circle" }
-        else if meeting { symbol = "record.circle" }
-        else if routing { symbol = "mic.fill" }
-        else { symbol = "mic" }
+        let tint: NSColor?
+        if muted {
+            symbol = "mic.slash"
+            tint = .systemRed
+        } else if meeting {
+            symbol = "record.circle"
+            tint = .systemRed
+        } else if micHot {
+            symbol = "mic.fill"
+            tint = .systemOrange
+        } else if routing {
+            symbol = "mic.fill"
+            tint = nil
+        } else if paused {
+            symbol = "pause.circle"
+            tint = nil
+        } else {
+            symbol = "mic"
+            tint = nil
+        }
         button.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Bluetooth Mic Router")
-        button.contentTintColor = meeting ? .systemRed : nil
+        button.contentTintColor = tint
     }
 }

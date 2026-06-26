@@ -18,19 +18,23 @@ final class AppModel: ObservableObject {
     @Published var meetingSince: Date?
     @Published var loginEnabled = false
     @Published var recordReminderDismissed = false
+    @Published var inputMuted = false
+    @Published var micInUse = false
 
     // MARK: - Dependencies
 
     private let settings: Settings
     private let onChange: () -> Void
     private let fixNowAction: () -> Void
+    private let muteAction: () -> Void
 
     // MARK: - Init
 
-    init(settings: Settings, onChange: @escaping () -> Void, fixNow: @escaping () -> Void) {
+    init(settings: Settings, onChange: @escaping () -> Void, fixNow: @escaping () -> Void, muteAction: @escaping () -> Void) {
         self.settings = settings
         self.onChange = onChange
         self.fixNowAction = fixNow
+        self.muteAction = muteAction
         self.loginEnabled = LoginItem.isEnabled
         self.paused = settings.paused
     }
@@ -44,7 +48,9 @@ final class AppModel: ObservableObject {
         activeInputSampleRateKHz: Int?,
         routingActive: Bool,
         meetingActive: Bool,
-        meetingSince: Date?
+        meetingSince: Date?,
+        inputMuted: Bool,
+        micInUse: Bool
     ) {
         self.devices = devices
         self.activeOutputName = activeOutputName
@@ -59,6 +65,19 @@ final class AppModel: ObservableObject {
         self.meetingSince = meetingSince
         self.paused = settings.paused
         self.loginEnabled = LoginItem.isEnabled
+        self.inputMuted = inputMuted
+        self.micInUse = micInUse
+    }
+
+    // MARK: - Mute hotkey
+
+    var muteHotkeyEnabled: Bool {
+        get { settings.muteHotkeyEnabled }
+        set { settings.muteHotkeyEnabled = newValue; onChange() }
+    }
+
+    func toggleMute() {
+        muteAction()
     }
 
     // MARK: - Device helpers
