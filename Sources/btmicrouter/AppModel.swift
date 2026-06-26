@@ -31,6 +31,7 @@ final class AppModel: ObservableObject {
         self.onChange = onChange
         self.fixNowAction = fixNow
         self.loginEnabled = LoginItem.isEnabled
+        self.paused = settings.paused
     }
 
     // MARK: - Refresh (called by AppDelegate to push fresh live state)
@@ -200,6 +201,7 @@ final class AppModel: ObservableObject {
 
     func togglePaused() {
         settings.paused.toggle()
+        self.paused = settings.paused
         onChange()
     }
 
