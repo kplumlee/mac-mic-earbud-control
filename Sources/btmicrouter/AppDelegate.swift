@@ -1,5 +1,6 @@
 import AppKit
 import os
+import UserNotifications
 import RoutingCore
 
 private let appLog = Logger(subsystem: "com.kplumlee.btmicrouter", category: "AppDelegate")
@@ -17,11 +18,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onUserChange: { [weak self] in self?.apply() },
             onFixNow: { [weak self] in self?.apply() })
         manager.startListening { [weak self] in self?.scheduleApply() }
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(frontmostAppChanged(_:)),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil)
+        setupNotifications()
         apply()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         manager.stopListening()
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    @objc private func frontmostAppChanged(_ note: Notification) {
+        scheduleApply()
     }
 
     /// Coalesce listener storms (rapid connect/disconnect) before acting.
@@ -32,18 +44,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: item)
     }
 
+    private func setupNotifications() {
+        guard Bundle.main.bundleIdentifier != nil else {
+            appLog.info("switch notifications disabled — no bundle identifier (run as .app to enable)")
+            return
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, error in
+            if let error = error {
+                appLog.error("notification auth error: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    private func notifySwitch(to micName: String) {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Mic switched"
+        content.body = "Input → \(micName)"
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                appLog.error("notification post error: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
     private func apply() {
         let devices = manager.allDevices()
         let activeOutput = manager.defaultOutputDevice().flatMap { id in
             devices.first { $0.id == id }
         }
-        // TODO: wire up frontmostBundleID in a later task
         let decision = RoutingPolicy.decide(
             activeOutput: activeOutput,
             devices: devices,
             profiles: settings.profiles,
             paused: settings.paused,
-            frontmostBundleID: nil,
+            frontmostBundleID: FrontmostApp.bundleID(),
             callAppsOnly: settings.callAppsOnly,
             callApps: settings.callApps)
 
@@ -53,7 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .setInput(let id):
             if manager.defaultInputDevice() != id {
                 let success = manager.setDefaultInputDevice(id)
-                if !success {
+                if success {
+                    let name = devices.first { $0.id == id }?.name ?? "unknown"
+                    notifySwitch(to: name)
+                } else {
                     appLog.error("Failed to set default input device id=\(id, privacy: .public)")
                 }
             }
