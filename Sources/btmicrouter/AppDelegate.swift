@@ -1,5 +1,8 @@
 import AppKit
+import os
 import RoutingCore
+
+private let appLog = Logger(subsystem: "com.kplumlee.btmicrouter", category: "AppDelegate")
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let manager = AudioDeviceManager()
@@ -46,7 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             break
         case .setInput(let id):
             if manager.defaultInputDevice() != id {
-                manager.setDefaultInputDevice(id)
+                let success = manager.setDefaultInputDevice(id)
+                if !success {
+                    appLog.error("Failed to set default input device id=\(id, privacy: .public)")
+                }
             }
         }
         menuController.refreshMenu(devices: devices)
