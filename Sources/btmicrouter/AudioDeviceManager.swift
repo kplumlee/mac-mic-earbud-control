@@ -147,6 +147,57 @@ final class AudioDeviceManager {
         return status == noErr
     }
 
+    @discardableResult
+    func setDefaultOutputDevice(_ id: DeviceID) -> Bool {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var dev = AudioDeviceID(id)
+        let status = AudioObjectSetPropertyData(
+            system, &addr, 0, nil,
+            UInt32(MemoryLayout<AudioDeviceID>.size), &dev)
+        return status == noErr
+    }
+
+    func isInputMuted() -> Bool {
+        guard let id = defaultInputDevice() else { return false }
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain)
+        var value = UInt32(0)
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(AudioDeviceID(id), &addr, 0, nil, &size, &value)
+        guard status == noErr else { return false }
+        return value != 0
+    }
+
+    @discardableResult
+    func setInputMuted(_ muted: Bool) -> Bool {
+        guard let id = defaultInputDevice() else { return false }
+        let devID = AudioDeviceID(id)
+        var muteAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain)
+        var muteValue = UInt32(muted ? 1 : 0)
+        let muteStatus = AudioObjectSetPropertyData(
+            devID, &muteAddr, 0, nil,
+            UInt32(MemoryLayout<UInt32>.size), &muteValue)
+        if muteStatus == noErr { return true }
+        // Fallback: device has no Mute property — use VolumeScalar
+        var volAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain)
+        var volValue = Float32(muted ? 0.0 : 1.0)
+        let volStatus = AudioObjectSetPropertyData(
+            devID, &volAddr, 0, nil,
+            UInt32(MemoryLayout<Float32>.size), &volValue)
+        return volStatus == noErr
+    }
+
     // MARK: - Listening
 
     private var listenerAddresses: [AudioObjectPropertyAddress] = []
