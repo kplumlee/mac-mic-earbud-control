@@ -10,13 +10,38 @@ Non-AirPods Bluetooth headsets drop to telephone-quality audio the moment an app
 uses their mic (HFP/HSP). There is no API to fix the mic codec, so this app
 routes *around* it: headset for output, a good mic for input.
 
-## Build
+## Install (recommended: app bundle)
+
+Building as a `.app` bundle is the recommended installation path. It enables:
+
+- **Switch notifications** — `UNUserNotificationCenter` requires a bundle
+  identifier; the bare binary cannot send system notifications.
+- **Stable launch-at-login path** — "Launch at login" from the menu writes a
+  LaunchAgent that points at `BTMicRouter.app/Contents/MacOS/btmicrouter`,
+  which survives rebuilds as long as the app stays in the same location.
+
+```
+./scripts/build-app.sh
+mv BTMicRouter.app ~/Applications/
+open ~/Applications/BTMicRouter.app
+```
+
+The app lives in the menu bar (🎙️). There is no Dock icon (`LSUIElement=true`).
+
+> **Note on signing:** the script uses ad-hoc code signing (`codesign -s -`),
+> which is sufficient for running on your own Mac. If macOS Gatekeeper blocks
+> the first launch, right-click → Open, or run:
+> `xattr -dr com.apple.quarantine ~/Applications/BTMicRouter.app`
+
+## Build (bare binary, advanced)
 
     swift build -c release
 
-The binary lands at `.build/release/btmicrouter`.
+The binary lands at `.build/release/btmicrouter`. This is useful for quick
+iteration or running `--list`, but **notifications will not work** without the
+app bundle.
 
-## Install (stable path for login item)
+## Install (bare binary, legacy path)
 
     mkdir -p ~/Applications/btmicrouter
     cp .build/release/btmicrouter ~/Applications/btmicrouter/btmicrouter
@@ -24,6 +49,21 @@ The binary lands at `.build/release/btmicrouter`.
 
 Then enable **Launch at login** from the menu (writes a LaunchAgent pointing at
 that stable path; effective next login).
+
+## Features
+
+- **Per-device profiles** — each Bluetooth headset independently remembers
+  whether it is managed and which mic priority order to use. Profiles are
+  stored in `UserDefaults` keyed by device UID.
+- **Live quality readout** — the menu shows the current input sample rate with
+  a ✅ (high quality, ≥ 44 kHz) or ⚠️ (degraded, telephone-quality) indicator
+  so you can confirm routing is working at a glance.
+- **Switch notifications** — when the app changes the input device a macOS
+  system notification is delivered (requires the app bundle; grant permission
+  on first launch).
+- **Per-app rules ("Only switch for call apps")** — enable this option per
+  device to restrict automatic switching to a configurable list of call
+  applications (Zoom, Teams, FaceTime, etc.), leaving other apps undisturbed.
 
 ## Usage
 
