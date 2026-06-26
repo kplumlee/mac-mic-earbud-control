@@ -13,7 +13,7 @@
 - `RoutingCore` stays pure (Foundation only).
 - **Universal default:** no hardcoded device names in defaults. `Settings.defaultPriority` becomes `[]`. Selection falls back to "best non-Bluetooth input."
 - `AudioDeviceInfo` gains `sampleRate: Double` and `inputChannels: Int` (so "best mic" = highest sample rate, then most input channels). Update ALL constructors + tests.
-- New settings (all persisted): per-`DeviceProfile` `manageOutput: Bool` (default false; DeviceProfile must DECODE MISSING fields as defaults so old JSON still loads — use `decodeIfPresent`); global `preferredOutputName: String?`; `muteHotkeyEnabled: Bool` (default true); `calendarPrelaunchEnabled: Bool` (default false); `calendarLeadMinutes: Int` (default 1).
+- New settings (all persisted): global `autoSwitchOutputToBluetooth: Bool` (default TRUE — always set a connecting Bluetooth headphone as the default output); `preferredOutputName: String?` (the device to switch the output BACK to when the Bluetooth headphone disconnects; nil = leave as macOS chooses); `muteHotkeyEnabled: Bool` (default true); `calendarPrelaunchEnabled: Bool` (default false); `calendarLeadMinutes: Int` (default 1).
 - ENV: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer` for all swift commands.
 
 ---
@@ -86,7 +86,7 @@ Commit `feat: settings for output management, mute hotkey, calendar`.
 **Files:** create `Sources/btmicrouter/CalendarService.swift`; modify `scripts/build-app.sh`.
 
 - `build-app.sh`: add `NSCalendarsUsageDescription` (string explaining "shows your next meeting and can pre-launch your notes app") to the generated Info.plist.
-- `CalendarService`: `func requestAccess(_ completion: @escaping (Bool) -> Void)` (`EKEventStore.requestAccess(to: .event)`); `struct UpcomingMeeting { let title: String; let start: Date; let joinURL: URL? }`; `func nextMeeting(within hours: Int) -> UpcomingMeeting?` — query events from now to now+hours on the default calendars, return the soonest; parse a join URL from the event's `url`, `location`, or `notes` (regex for `https://[^ ]*(zoom.us|meet.google.com|teams.microsoft.com|webex.com)[^ ]*`). Handle "no access" gracefully (returns nil).
+- `CalendarService`: `func requestAccess(_ completion: @escaping (Bool) -> Void)` (`EKEventStore.requestAccess(to: .event)`); `struct UpcomingMeeting { let title: String; let start: Date; let joinURL: URL? }`; `func nextMeeting(within hours: Int) -> UpcomingMeeting?` — build the predicate with `predicateForEvents(withStart:end:calendars: nil)` so it spans **ALL connected calendars across ALL accounts** (iCloud, Google, Microsoft 365/Exchange — whatever the user added in System Settings → Internet Accounts), NOT just the default calendar; return the soonest; parse a join URL from the event's `url`, `location`, or `notes` (regex for `https://[^ ]*(zoom.us|meet.google.com|teams.microsoft.com|webex.com)[^ ]*`). Handle "no access" gracefully (returns nil). The app does NOT do any provider OAuth — it relies on macOS Calendar's synced accounts, which is the whole point (Google + Microsoft 365 work automatically).
 - Build-verified. Commit `feat: EventKit calendar service for next meeting`.
 
 ---
