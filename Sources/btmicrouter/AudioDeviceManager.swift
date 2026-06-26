@@ -106,6 +106,19 @@ final class AudioDeviceManager {
         return Double(value)
     }
 
+    func isDefaultInputInUse() -> Bool {
+        guard let id = defaultInputDevice() else { return false }
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var value = UInt32(0)
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(AudioDeviceID(id), &addr, 0, nil, &size, &value)
+        guard status == noErr else { return false }
+        return value != 0
+    }
+
     // MARK: - Writing
 
     @discardableResult
