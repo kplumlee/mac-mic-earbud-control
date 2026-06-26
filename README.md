@@ -74,6 +74,38 @@ that stable path; effective next login).
   `EarPods Microphone`; the first one present is used.
 - Pause / Resume and Fix input now are in the menu.
 
+## Meeting automation
+
+When **Meeting automation** is enabled (toggle in the menu), the app watches for
+an active meeting and automatically:
+
+- **Detects the meeting** — a configured call app (Zoom, Teams, FaceTime, etc.)
+  must be running *and* the microphone must be live. Browser meetings (e.g.
+  Google Meet in Chrome) are detected only if the browser is in your call-apps
+  list and the mic is in use.
+- **Auto-launches apps** — any apps in your launch list (e.g. Granola) are
+  opened in the background at meeting start.
+- **Pauses Spotify / Music** — if either app is currently *playing*, it is
+  paused when the meeting starts and automatically resumed when the meeting ends
+  (or when the app quits mid-meeting). Apps that are already paused are left
+  untouched so music that was manually stopped is never unexpectedly restarted.
+- **Shows meeting state** — the menu-bar icon updates and the menu shows a
+  🔴 "In a meeting" entry with the elapsed time.
+
+### Configuring meeting automation
+
+| Menu item | What it does |
+|---|---|
+| Meeting automation | Master toggle — enable/disable all automation |
+| Launch apps on meeting | Comma-separated list of app names to open at start |
+| Pause music on meeting | Toggle music pause/resume behaviour |
+
+### First-run permission prompt
+
+The first time the app pauses Spotify or Music, macOS shows a one-time
+automation prompt: *"btmicrouter wants to control Spotify."* Click **Allow**.
+Without it the pause/resume commands are silently ignored.
+
 ## Inspect detected devices
 
     ./.build/release/btmicrouter --list

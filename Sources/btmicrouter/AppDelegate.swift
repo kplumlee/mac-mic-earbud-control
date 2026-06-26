@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if didPauseMusic { setMusicPlaying(true); didPauseMusic = false }
         meetingTimer?.invalidate()
         manager.stopListening()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
@@ -175,9 +176,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Execute an AppleScript snippet, logging any automation errors.
+    private func runAppleScript(_ source: String) {
+        var err: NSDictionary?
+        NSAppleScript(source: source)?.executeAndReturnError(&err)
+        if let err = err {
+            appLog.error("AppleScript error: \(String(describing: err), privacy: .public)")
+        }
+    }
+
+    /// Returns true iff the named music app reports its player state as "playing".
+    private func musicIsPlaying(_ appName: String) -> Bool {
+        let source = "tell application \"\(appName)\" to player state as string"
+        var err: NSDictionary?
+        let result = NSAppleScript(source: source)?.executeAndReturnError(&err)
+        if let err = err {
+            appLog.error("AppleScript error: \(String(describing: err), privacy: .public)")
+            return false
+        }
+        return result?.stringValue == "playing"
+    }
+
     @discardableResult
     private func setMusicPlaying(_ playing: Bool) -> Bool {
-        let verb = playing ? "play" : "pause"
         let apps: [(bundleID: String, appName: String)] = [
             ("com.spotify.client", "Spotify"),
             ("com.apple.Music", "Music")
@@ -186,9 +207,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var dispatched = false
         for (bundleID, appName) in apps {
             guard running.contains(bundleID) else { continue }
-            let source = "tell application \"\(appName)\" to \(verb)"
-            NSAppleScript(source: source)?.executeAndReturnError(nil)
-            dispatched = true
+            if playing {
+                runAppleScript("tell application \"\(appName)\" to play")
+                dispatched = true
+            } else if musicIsPlaying(appName) {
+                runAppleScript("tell application \"\(appName)\" to pause")
+                dispatched = true
+            }
         }
         return dispatched
     }
