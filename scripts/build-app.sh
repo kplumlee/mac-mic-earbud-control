@@ -40,6 +40,8 @@ cat > "${APP_NAME}/Contents/Info.plist" <<'PLIST'
     <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Shows your next meeting and can open the join link and your notes app when a meeting is about to start.</string>
 </dict>
 </plist>
 PLIST
