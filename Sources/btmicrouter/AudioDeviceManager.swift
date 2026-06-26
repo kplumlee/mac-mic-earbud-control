@@ -40,7 +40,8 @@ final class AudioDeviceManager {
         guard count > 0 else { return [] }
         var ids = [AudioDeviceID](repeating: 0, count: count)
         guard AudioObjectGetPropertyData(system, &addr, 0, nil, &size, &ids) == noErr else { return [] }
-        return ids.map { info(for: $0) }
+        let actualCount = Int(size) / MemoryLayout<AudioDeviceID>.size
+        return ids.prefix(actualCount).map { info(for: $0) }
     }
 
     private func info(for id: AudioDeviceID) -> AudioDeviceInfo {
@@ -112,13 +113,14 @@ final class AudioDeviceManager {
     private var listenerBlock: AudioObjectPropertyListenerBlock?
 
     func startListening(onChange: @escaping () -> Void) {
+        if listenerBlock != nil { stopListening() }
         let selectors: [AudioObjectPropertySelector] = [
             kAudioHardwarePropertyDefaultOutputDevice,
             kAudioHardwarePropertyDefaultInputDevice,
             kAudioHardwarePropertyDevices,
         ]
         let block: AudioObjectPropertyListenerBlock = { _, _ in
-            DispatchQueue.main.async { onChange() }
+            onChange()
         }
         listenerBlock = block
         for selector in selectors {
