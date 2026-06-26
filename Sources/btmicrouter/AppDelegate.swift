@@ -32,6 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // "appeared" diff on the very first run is empty — preventing us from
     // hijacking the output at launch.
     private var previousDevices: [AudioDeviceInfo] = []
+    private var previousDefaultOutputName: String?
+
+    // Calendar throttle
+    private var calendarTickCounter = 0
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         MainActor.assumeIsolated {
@@ -57,13 +61,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Seed previousDevices before the first apply() so the "appeared"
         // diff on launch is empty and we don't hijack the current output.
         previousDevices = manager.allDevices()
+        previousDefaultOutputName = manager.defaultOutputDevice().flatMap { id in previousDevices.first { $0.id == id }?.name }
         updateMuteHotKeyRegistration()
         apply()
 
         meetingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.evaluateMeeting()
-            self?.pushState()
-            self?.checkCalendar()
+            guard let self else { return }
+            self.evaluateMeeting()
+            self.pushState()
+            // Throttle the synchronous EventKit query to ~30 s (every 15th tick).
+            self.calendarTickCounter += 1
+            if self.calendarTickCounter % 15 == 0 {
+                self.checkCalendar()
+            }
         }
     }
 
@@ -155,34 +165,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Launch guard: previousDevices is seeded in applicationDidFinishLaunching
     /// before the first apply(), so the "appeared" set on the first run is empty
     /// and we never hijack output at startup.
+    ///
+    /// Tracking (previousDevices, previousDefaultOutputName) is always updated so
+    /// diffs stay correct even while paused. Side-effecting switches and
+    /// auto-manage are gated behind !settings.paused (Fix 5).
     private func manageOutput(devices: [AudioDeviceInfo]) {
         let currentNames = Set(devices.map { $0.name })
         let previousNames = Set(previousDevices.map { $0.name })
         let appeared = currentNames.subtracting(previousNames)
         let disappeared = previousNames.subtracting(currentNames)
 
-        // A Bluetooth headphone connected -> make it the output.
-        if settings.autoSwitchOutputToBluetooth,
-           let dev = devices.first(where: {
-               appeared.contains($0.name) && $0.transport == .bluetooth && $0.hasOutput && !isAirPods($0.name)
-           }) {
-            _ = manager.setDefaultOutputDevice(dev.id)
-            appLog.info("output → \(dev.name, privacy: .public) (BT connect)")
+        if !settings.paused {
+            // Fix 3: Auto-manage newly-connected Bluetooth headsets with no stored
+            // profile. Creates managed=true so mic routing works out of the box; a
+            // later user-set unmanaged profile is never overwritten (we only create
+            // when profiles[name] == nil).
+            for dev in devices where appeared.contains(dev.name)
+                    && dev.transport == .bluetooth
+                    && dev.hasOutput
+                    && !isAirPods(dev.name)
+                    && settings.profiles[dev.name] == nil {
+                settings.setProfile(DeviceProfile(managed: true, micPriority: []), for: dev.name)
+                appLog.info("auto-managed new BT device: \(dev.name, privacy: .public)")
+            }
+
+            // A Bluetooth headphone connected -> make it the output.
+            if settings.autoSwitchOutputToBluetooth,
+               let dev = devices.first(where: {
+                   appeared.contains($0.name) && $0.transport == .bluetooth && $0.hasOutput && !isAirPods($0.name)
+               }) {
+                _ = manager.setDefaultOutputDevice(dev.id)
+                appLog.info("output → \(dev.name, privacy: .public) (BT connect)")
+            }
+
+            // Fix 4: Only fall back when the device we were ACTUALLY outputting to
+            // (a BT output) just disconnected — not when any idle BT device leaves.
+            if let prevOut = previousDefaultOutputName,
+               disappeared.contains(prevOut),
+               previousDevices.contains(where: {
+                   $0.name == prevOut && $0.transport == .bluetooth && $0.hasOutput && !isAirPods($0.name)
+               }),
+               let preferred = settings.preferredOutputName,
+               let target = devices.first(where: { $0.name == preferred && $0.hasOutput }),
+               manager.defaultOutputDevice() != target.id {
+                _ = manager.setDefaultOutputDevice(target.id)
+                appLog.info("output → \(target.name, privacy: .public) (BT disconnect fallback)")
+            }
         }
 
-        // A Bluetooth output device disconnected -> fall back to the chosen output.
-        let btOutputLeft = previousDevices.contains {
-            disappeared.contains($0.name) && $0.transport == .bluetooth && $0.hasOutput && !isAirPods($0.name)
-        }
-        if btOutputLeft,
-           let preferred = settings.preferredOutputName,
-           let target = devices.first(where: { $0.name == preferred && $0.hasOutput }),
-           manager.defaultOutputDevice() != target.id {
-            _ = manager.setDefaultOutputDevice(target.id)
-            appLog.info("output → \(target.name, privacy: .public) (BT disconnect fallback)")
-        }
-
+        // Always update tracking so diffs are correct on the next call.
         previousDevices = devices
+        previousDefaultOutputName = manager.defaultOutputDevice().flatMap { id in devices.first { $0.id == id }?.name }
     }
 
     private func pushState() {
@@ -230,6 +263,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.async {
                 self?.calendarAccessGranted = granted
                 self?.pushState()
+                // Query immediately so the next meeting shows up right away.
+                if granted { self?.checkCalendar() }
             }
         }
     }

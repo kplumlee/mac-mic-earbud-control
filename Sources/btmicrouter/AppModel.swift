@@ -109,13 +109,12 @@ final class AppModel: ObservableObject {
     }
 
     func micPriority(for name: String) -> [String] {
-        let p = settings.profile(for: name).micPriority
-        return p.isEmpty ? Settings.defaultPriority : p
+        settings.profile(for: name).micPriority
     }
 
     func moveMic(for name: String, fromOffsets: IndexSet, toOffset: Int) {
         var profile = settings.profile(for: name)
-        var list = profile.micPriority.isEmpty ? Settings.defaultPriority : profile.micPriority
+        var list = profile.micPriority
         // Replicate SwiftUI List.onMove semantics using only stdlib.
         let moving = fromOffsets.map { list[$0] }
         // Remove from highest index to lowest to keep indices stable.
@@ -130,7 +129,7 @@ final class AppModel: ObservableObject {
 
     func removeMic(for name: String, _ mic: String) {
         var profile = settings.profile(for: name)
-        var list = profile.micPriority.isEmpty ? Settings.defaultPriority : profile.micPriority
+        var list = profile.micPriority
         list.removeAll { $0 == mic }
         profile.micPriority = list
         settings.setProfile(profile, for: name)
@@ -139,7 +138,7 @@ final class AppModel: ObservableObject {
 
     func addMic(for name: String, _ mic: String) {
         var profile = settings.profile(for: name)
-        var list = profile.micPriority.isEmpty ? Settings.defaultPriority : profile.micPriority
+        var list = profile.micPriority
         if !list.contains(mic) {
             list.append(mic)
         }

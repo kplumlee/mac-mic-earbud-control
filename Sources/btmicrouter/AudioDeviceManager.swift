@@ -162,15 +162,34 @@ final class AudioDeviceManager {
 
     func isInputMuted() -> Bool {
         guard let id = defaultInputDevice() else { return false }
-        var addr = AudioObjectPropertyAddress(
+        let devID = AudioDeviceID(id)
+
+        // Try the hardware Mute property first (scope input).
+        var muteAddr = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyMute,
             mScope: kAudioObjectPropertyScopeInput,
             mElement: kAudioObjectPropertyElementMain)
-        var value = UInt32(0)
-        var size = UInt32(MemoryLayout<UInt32>.size)
-        let status = AudioObjectGetPropertyData(AudioDeviceID(id), &addr, 0, nil, &size, &value)
-        guard status == noErr else { return false }
-        return value != 0
+        var muteValue = UInt32(0)
+        var muteSize = UInt32(MemoryLayout<UInt32>.size)
+        let muteStatus = AudioObjectGetPropertyData(devID, &muteAddr, 0, nil, &muteSize, &muteValue)
+        if muteStatus == noErr {
+            return muteValue != 0
+        }
+
+        // Fallback: device has no Mute property (e.g. built-in mic) — use
+        // VolumeScalar. Mirror the write path: treat ~0 volume as muted.
+        var volAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain)
+        var volValue = Float32(0)
+        var volSize = UInt32(MemoryLayout<Float32>.size)
+        let volStatus = AudioObjectGetPropertyData(devID, &volAddr, 0, nil, &volSize, &volValue)
+        if volStatus == noErr {
+            return volValue <= 0.0001
+        }
+
+        return false
     }
 
     @discardableResult
