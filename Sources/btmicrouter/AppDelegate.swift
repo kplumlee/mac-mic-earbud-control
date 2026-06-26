@@ -22,7 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Seeded in applicationDidFinishLaunching before the first apply() so the
     // "appeared" diff on the very first run is empty — preventing us from
     // hijacking the output at launch.
-    private var previousDeviceNames: Set<String> = []
+    private var previousDevices: [AudioDeviceInfo] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         MainActor.assumeIsolated {
@@ -41,9 +41,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSWorkspace.didTerminateApplicationNotification,
             object: nil)
         setupNotifications()
-        // Seed previousDeviceNames before the first apply() so the "appeared"
+        // Seed previousDevices before the first apply() so the "appeared"
         // diff on launch is empty and we don't hijack the current output.
-        previousDeviceNames = Set(manager.allDevices().map { $0.name })
+        previousDevices = manager.allDevices()
         apply()
 
         meetingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
@@ -133,43 +133,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Diff the current device list against the previous one and apply output
     /// switching rules. Called on every debounced device-change via apply().
     ///
-    /// Launch guard: previousDeviceNames is seeded in applicationDidFinishLaunching
+    /// Launch guard: previousDevices is seeded in applicationDidFinishLaunching
     /// before the first apply(), so the "appeared" set on the first run is empty
     /// and we never hijack output at startup.
     private func manageOutput(devices: [AudioDeviceInfo]) {
         let currentNames = Set(devices.map { $0.name })
+        let previousNames = Set(previousDevices.map { $0.name })
+        let appeared = currentNames.subtracting(previousNames)
+        let disappeared = previousNames.subtracting(currentNames)
 
-        let appeared = currentNames.subtracting(previousDeviceNames)
-        if !appeared.isEmpty && settings.autoSwitchOutputToBluetooth {
-            // Pick the first newly-appeared Bluetooth output that is not AirPods.
-            if let device = devices.first(where: {
-                appeared.contains($0.name) &&
-                $0.transport == .bluetooth &&
-                $0.hasOutput &&
-                !isAirPods($0.name)
-            }) {
-                _ = manager.setDefaultOutputDevice(device.id)
-                appLog.info("output → \(device.name, privacy: .public) (BT connect)")
-            }
+        // A Bluetooth headphone connected -> make it the output.
+        if settings.autoSwitchOutputToBluetooth,
+           let dev = devices.first(where: {
+               appeared.contains($0.name) && $0.transport == .bluetooth && $0.hasOutput && !isAirPods($0.name)
+           }) {
+            _ = manager.setDefaultOutputDevice(dev.id)
+            appLog.info("output → \(dev.name, privacy: .public) (BT connect)")
         }
 
-        let disappeared = previousDeviceNames.subtracting(currentNames)
-        if !disappeared.isEmpty {
-            // Something disconnected. If a preferred fallback is configured and
-            // is currently present, and the current default output is not already
-            // that device, switch to it.
-            if let preferredName = settings.preferredOutputName,
-               let target = devices.first(where: { $0.name == preferredName && $0.hasOutput }) {
-                let currentDefaultName = manager.defaultOutputDevice()
-                    .flatMap { id in devices.first { $0.id == id }?.name }
-                if currentDefaultName != preferredName {
-                    _ = manager.setDefaultOutputDevice(target.id)
-                    appLog.info("output → \(target.name, privacy: .public) (BT disconnect fallback)")
-                }
-            }
+        // A Bluetooth output device disconnected -> fall back to the chosen output.
+        let btOutputLeft = previousDevices.contains {
+            disappeared.contains($0.name) && $0.transport == .bluetooth && $0.hasOutput && !isAirPods($0.name)
+        }
+        if btOutputLeft,
+           let preferred = settings.preferredOutputName,
+           let target = devices.first(where: { $0.name == preferred && $0.hasOutput }),
+           manager.defaultOutputDevice() != target.id {
+            _ = manager.setDefaultOutputDevice(target.id)
+            appLog.info("output → \(target.name, privacy: .public) (BT disconnect fallback)")
         }
 
-        previousDeviceNames = currentNames
+        previousDevices = devices
     }
 
     private func pushState() {
