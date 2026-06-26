@@ -30,7 +30,7 @@ final class RoutingPolicyTests: XCTestCase {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina, plumdog],
             profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
-            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: false, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .setInput(10))
     }
 
@@ -38,7 +38,7 @@ final class RoutingPolicyTests: XCTestCase {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, plumdog],
             profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
-            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: false, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .setInput(11))
     }
 
@@ -46,7 +46,7 @@ final class RoutingPolicyTests: XCTestCase {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei],
             profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
-            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: false, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
@@ -54,7 +54,7 @@ final class RoutingPolicyTests: XCTestCase {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina],
             profiles: [:], // empty = not managed
-            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: false, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
@@ -62,7 +62,7 @@ final class RoutingPolicyTests: XCTestCase {
         let d = RoutingPolicy.decide(
             activeOutput: airpods, devices: [airpods, lumina],
             profiles: profiles(managed: ["AirPods Pro"]),
-            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: false, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
@@ -70,7 +70,7 @@ final class RoutingPolicyTests: XCTestCase {
         let d = RoutingPolicy.decide(
             activeOutput: speakers, devices: [speakers, lumina],
             profiles: profiles(managed: ["Mac Studio Speakers"]),
-            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: false, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
@@ -78,7 +78,7 @@ final class RoutingPolicyTests: XCTestCase {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina],
             profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
-            paused: true, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: true, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .leaveAlone)
     }
 
@@ -89,38 +89,38 @@ final class RoutingPolicyTests: XCTestCase {
 
     // MARK: - Per-app gating tests
 
-    func testCallAppsOnlyBlocksWhenFrontmostNil() {
+    func testCallAppsOnlyBlocksWhenNoCallAppRunning() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina],
             profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
-            paused: false, frontmostBundleID: nil,
+            paused: false, runningBundleIDs: [],
             callAppsOnly: true, callApps: ["us.zoom.xos"])
         XCTAssertEqual(d, .leaveAlone)
     }
 
-    func testCallAppsOnlyBlocksWhenFrontmostNotInList() {
+    func testCallAppsOnlyBlocksWhenRunningAppsDisjointFromCallApps() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina],
             profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
-            paused: false, frontmostBundleID: "com.apple.Safari",
+            paused: false, runningBundleIDs: ["com.apple.Finder"],
             callAppsOnly: true, callApps: ["us.zoom.xos"])
         XCTAssertEqual(d, .leaveAlone)
     }
 
-    func testCallAppsOnlyAllowsWhenFrontmostInList() {
+    func testCallAppsOnlyAllowsWhenCallAppIsRunning() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina],
             profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
-            paused: false, frontmostBundleID: "us.zoom.xos",
+            paused: false, runningBundleIDs: ["com.apple.Finder", "us.zoom.xos"],
             callAppsOnly: true, callApps: ["us.zoom.xos"])
         XCTAssertEqual(d, .setInput(10))
     }
 
-    func testCallAppsOnlyFalseAllowsAnyApp() {
+    func testCallAppsOnlyFalseAllowsRegardlessOfRunningApps() {
         let d = RoutingPolicy.decide(
             activeOutput: huawei, devices: [huawei, lumina],
             profiles: profiles(managed: ["HUAWEI FreeClip 2"]),
-            paused: false, frontmostBundleID: "com.apple.Safari",
+            paused: false, runningBundleIDs: [],
             callAppsOnly: false, callApps: [])
         XCTAssertEqual(d, .setInput(10))
     }
@@ -142,13 +142,13 @@ final class RoutingPolicyTests: XCTestCase {
         let dA = RoutingPolicy.decide(
             activeOutput: deviceA, devices: [deviceA, lumina, plumdog],
             profiles: p,
-            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: false, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(dA, .setInput(11)) // PlumDog wins for DeviceA
 
         let dB = RoutingPolicy.decide(
             activeOutput: deviceB, devices: [deviceB, lumina, plumdog],
             profiles: p,
-            paused: false, frontmostBundleID: nil, callAppsOnly: false, callApps: [])
+            paused: false, runningBundleIDs: [], callAppsOnly: false, callApps: [])
         XCTAssertEqual(dB, .setInput(10)) // Lumina wins for DeviceB
     }
 }

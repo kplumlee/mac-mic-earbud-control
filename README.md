@@ -54,9 +54,9 @@ that stable path; effective next login).
 
 - **Per-device profiles** — each Bluetooth headset independently remembers
   whether it is managed and which mic priority order to use. Profiles are
-  stored in `UserDefaults` keyed by device UID.
+  stored in `UserDefaults` keyed by device name.
 - **Live quality readout** — the menu shows the current input sample rate with
-  a ✅ (high quality, ≥ 44 kHz) or ⚠️ (degraded, telephone-quality) indicator
+  a ✅ (high quality, ≥ 24 kHz) or ⚠️ (degraded, telephone-quality) indicator
   so you can confirm routing is working at a glance.
 - **Switch notifications** — when the app changes the input device a macOS
   system notification is delivered (requires the app bundle; grant permission
@@ -64,6 +64,7 @@ that stable path; effective next login).
 - **Per-app rules ("Only switch for call apps")** — enable this option per
   device to restrict automatic switching to a configurable list of call
   applications (Zoom, Teams, FaceTime, etc.), leaving other apps undisturbed.
+  Per-app rules trigger when a configured call app is running (not necessarily frontmost).
 
 ## Usage
 

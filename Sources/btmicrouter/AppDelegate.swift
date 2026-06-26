@@ -20,8 +20,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         manager.startListening { [weak self] in self?.scheduleApply() }
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
-            selector: #selector(frontmostAppChanged(_:)),
-            name: NSWorkspace.didActivateApplicationNotification,
+            selector: #selector(runningAppsChanged(_:)),
+            name: NSWorkspace.didLaunchApplicationNotification,
+            object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(runningAppsChanged(_:)),
+            name: NSWorkspace.didTerminateApplicationNotification,
             object: nil)
         setupNotifications()
         apply()
@@ -32,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
-    @objc private func frontmostAppChanged(_ note: Notification) {
+    @objc private func runningAppsChanged(_ note: Notification) {
         scheduleApply()
     }
 
@@ -59,8 +64,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func notifySwitch(to micName: String) {
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Mic switched"
-        content.body = "Input → \(micName)"
+        content.title = "Bluetooth Mic Router"
+        content.body = "Mic → \(micName)"
         let request = UNNotificationRequest(
             identifier: UUID().uuidString,
             content: content,
@@ -82,7 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             devices: devices,
             profiles: settings.profiles,
             paused: settings.paused,
-            frontmostBundleID: FrontmostApp.bundleID(),
+            runningBundleIDs: RunningApps.bundleIDs(),
             callAppsOnly: settings.callAppsOnly,
             callApps: settings.callApps)
 

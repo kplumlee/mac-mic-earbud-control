@@ -195,20 +195,14 @@ final class StatusMenuController: NSObject {
         }
     }
 
-    /// Build a profiles dictionary from the currently-visible devices, deduping by first-seen name.
-    private func buildProfiles(devices: [AudioDeviceInfo]) -> [String: DeviceProfile] {
-        Dictionary(devices.map { ($0.name, settings.profile(for: $0.name)) },
-                   uniquingKeysWith: { a, _ in a })
-    }
-
     private func isRoutingActive(devices: [AudioDeviceInfo]) -> Bool {
         guard let outID = manager.defaultOutputDevice(),
               let out = devices.first(where: { $0.id == outID }) else { return false }
         let decision = RoutingPolicy.decide(
             activeOutput: out, devices: devices,
-            profiles: buildProfiles(devices: devices),
+            profiles: settings.profiles,
             paused: settings.paused,
-            frontmostBundleID: FrontmostApp.bundleID(),
+            runningBundleIDs: RunningApps.bundleIDs(),
             callAppsOnly: settings.callAppsOnly,
             callApps: settings.callApps)
         if case .setInput = decision { return true }
@@ -221,9 +215,9 @@ final class StatusMenuController: NSObject {
               let out = devices.first(where: { $0.id == outID }) else { return "Idle" }
         let decision = RoutingPolicy.decide(
             activeOutput: out, devices: devices,
-            profiles: buildProfiles(devices: devices),
+            profiles: settings.profiles,
             paused: settings.paused,
-            frontmostBundleID: FrontmostApp.bundleID(),
+            runningBundleIDs: RunningApps.bundleIDs(),
             callAppsOnly: settings.callAppsOnly,
             callApps: settings.callApps)
         switch decision {

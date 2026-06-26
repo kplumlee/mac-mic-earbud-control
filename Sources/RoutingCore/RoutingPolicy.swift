@@ -12,7 +12,7 @@ public enum RoutingPolicy {
         devices: [AudioDeviceInfo],
         profiles: [String: DeviceProfile],
         paused: Bool,
-        frontmostBundleID: String?,
+        runningBundleIDs: Set<String>,
         callAppsOnly: Bool,
         callApps: [String]
     ) -> RoutingDecision {
@@ -20,22 +20,19 @@ public enum RoutingPolicy {
         if paused { return .leaveAlone }
 
         // (2) per-app gate
-        if callAppsOnly {
-            guard let bundleID = frontmostBundleID, callApps.contains(bundleID) else {
-                return .leaveAlone
-            }
+        if callAppsOnly && Set(callApps).isDisjoint(with: runningBundleIDs) {
+            return .leaveAlone
         }
 
         // (3) guard: Bluetooth, not AirPods, managed
         guard let output = activeOutput,
               output.transport == .bluetooth,
               !isAirPods(output.name),
-              profiles[output.name]?.managed == true
+              let profile = profiles[output.name], profile.managed
         else { return .leaveAlone }
 
         // (4) pick mic by priority
-        let micPriority = profiles[output.name]!.micPriority
-        let priority = micPriority.isEmpty ? Settings.defaultPriority : micPriority
+        let priority = profile.micPriority.isEmpty ? Settings.defaultPriority : profile.micPriority
         for name in priority {
             if let match = devices.first(where: { $0.name == name && $0.hasInput }) {
                 return .setInput(match.id)
