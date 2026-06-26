@@ -69,4 +69,38 @@ final class SettingsTests: XCTestCase {
         s.paused = true
         XCTAssertTrue(s.paused)
     }
+
+    // MARK: - Meeting automation settings
+
+    func testMeetingAutomationDefaultsWhenUnset() {
+        let s = freshSettings()
+        XCTAssertTrue(s.meetingAutomationEnabled)
+        XCTAssertEqual(s.launchAppsOnMeeting, ["Granola"])
+        XCTAssertTrue(s.pauseMusicOnMeeting)
+    }
+
+    func testMeetingAutomationEnabledRoundTrip() {
+        let s = freshSettings()
+        XCTAssertTrue(s.meetingAutomationEnabled)
+        s.meetingAutomationEnabled = false
+        XCTAssertFalse(s.meetingAutomationEnabled)
+        s.meetingAutomationEnabled = true
+        XCTAssertTrue(s.meetingAutomationEnabled)
+    }
+
+    func testLaunchAppsOnMeetingRoundTrip() {
+        let s = freshSettings()
+        let custom = ["com.custom.noteapp", "com.custom.other"]
+        s.launchAppsOnMeeting = custom
+        XCTAssertEqual(s.launchAppsOnMeeting, custom)
+    }
+
+    func testPauseMusicOnMeetingRoundTrip() {
+        let s = freshSettings()
+        XCTAssertTrue(s.pauseMusicOnMeeting)
+        s.pauseMusicOnMeeting = false
+        XCTAssertFalse(s.pauseMusicOnMeeting)
+        s.pauseMusicOnMeeting = true
+        XCTAssertTrue(s.pauseMusicOnMeeting)
+    }
 }

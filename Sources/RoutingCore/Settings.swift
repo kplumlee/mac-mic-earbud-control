@@ -8,6 +8,9 @@ public final class Settings {
         static let callAppsOnly = "callAppsOnly"
         static let callApps = "callApps"
         static let paused = "paused"
+        static let meetingAutomationEnabled = "meetingAutomationEnabled"
+        static let launchAppsOnMeeting = "launchAppsOnMeeting"
+        static let pauseMusicOnMeeting = "pauseMusicOnMeeting"
     }
 
     public static let defaultPriority = [
@@ -66,5 +69,20 @@ public final class Settings {
     public var paused: Bool {
         get { defaults.bool(forKey: Key.paused) }
         set { defaults.set(newValue, forKey: Key.paused) }
+    }
+
+    public var meetingAutomationEnabled: Bool {
+        get { defaults.object(forKey: Key.meetingAutomationEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.meetingAutomationEnabled) }
+    }
+
+    public var launchAppsOnMeeting: [String] {
+        get { defaults.stringArray(forKey: Key.launchAppsOnMeeting) ?? ["Granola"] }
+        set { defaults.set(newValue, forKey: Key.launchAppsOnMeeting) }
+    }
+
+    public var pauseMusicOnMeeting: Bool {
+        get { defaults.object(forKey: Key.pauseMusicOnMeeting) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.pauseMusicOnMeeting) }
     }
 }
