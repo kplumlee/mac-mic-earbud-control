@@ -45,12 +45,25 @@ final class AudioDeviceManager {
     }
 
     private func info(for id: AudioDeviceID) -> AudioDeviceInfo {
-        AudioDeviceInfo(
+        let sr: Double = {
+            var addr = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyNominalSampleRate,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain)
+            var value: Float64 = 0
+            var size = UInt32(MemoryLayout<Float64>.size)
+            let status = AudioObjectGetPropertyData(id, &addr, 0, nil, &size, &value)
+            return status == noErr ? Double(value) : 0
+        }()
+        let inputStreams = streamCount(id, scope: kAudioObjectPropertyScopeInput)
+        return AudioDeviceInfo(
             id: DeviceID(id),
             name: deviceName(id) ?? "Unknown",
             transport: deviceTransport(id),
             hasOutput: streamCount(id, scope: kAudioObjectPropertyScopeOutput) > 0,
-            hasInput: streamCount(id, scope: kAudioObjectPropertyScopeInput) > 0)
+            hasInput: inputStreams > 0,
+            sampleRate: sr,
+            inputChannels: inputStreams)
     }
 
     private func deviceName(_ id: AudioDeviceID) -> String? {

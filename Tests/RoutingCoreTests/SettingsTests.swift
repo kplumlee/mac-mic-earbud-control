@@ -26,9 +26,12 @@ final class SettingsTests: XCTestCase {
     }
 
     func testProfileForReturnsDefaultForUnknownDevice() {
+        // Since task-23, defaultPriority is [] — unknown devices get an unmanaged
+        // profile with an empty micPriority, triggering universal auto-pick in decide().
         let s = freshSettings()
         let p = s.profile(for: "SomeUnknownHeadset")
-        XCTAssertEqual(p, DeviceProfile(managed: false, micPriority: Settings.defaultPriority))
+        XCTAssertEqual(p, DeviceProfile(managed: false, micPriority: []))
+        XCTAssertEqual(Settings.defaultPriority, [])
     }
 
     func testSetProfileAndProfileFor() {

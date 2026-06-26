@@ -14,11 +14,7 @@ public final class Settings {
         static let recordReminderEnabled = "recordReminderEnabled"
     }
 
-    public static let defaultPriority = [
-        "Lumina Camera - Raw",
-        "PlumDog Microphone",
-        "EarPods Microphone",
-    ]
+    public static let defaultPriority: [String] = []
 
     public static let defaultCallApps = [
         "us.zoom.xos",
