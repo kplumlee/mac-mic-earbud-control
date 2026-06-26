@@ -8,7 +8,8 @@ private let appLog = Logger(subsystem: "com.kplumlee.btmicrouter", category: "Ap
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let manager = AudioDeviceManager()
     private let settings = Settings()
-    private var menuController: StatusMenuController!
+    private var model: AppModel!
+    private var statusItemController: StatusItemController!
     private var debounceItem: DispatchWorkItem?
 
     // Meeting coordinator state
@@ -18,11 +19,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var didPauseMusic = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        menuController = StatusMenuController(
-            settings: settings,
-            manager: manager,
-            onUserChange: { [weak self] in self?.apply() },
-            onFixNow: { [weak self] in self?.apply() })
+        MainActor.assumeIsolated {
+            model = AppModel(settings: settings, onChange: { [weak self] in self?.apply() }, fixNow: { [weak self] in self?.apply() })
+            statusItemController = StatusItemController(model: model)
+        }
         manager.startListening { [weak self] in self?.scheduleApply() }
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
@@ -117,7 +117,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
-        menuController.refreshMenu(devices: devices)
+        pushState()
+    }
+
+    private func pushState() {
+        let devices = manager.allDevices()
+        let outName = manager.defaultOutputDevice().flatMap { id in devices.first { $0.id == id }?.name }
+        let inID = manager.defaultInputDevice()
+        let inName = inID.flatMap { id in devices.first { $0.id == id }?.name }
+        let kHz = inID.flatMap { manager.nominalSampleRate(for: $0) }.map { Int(($0 / 1000).rounded()) }
+        let activeOutput = manager.defaultOutputDevice().flatMap { id in devices.first { $0.id == id } }
+        let decision = RoutingPolicy.decide(
+            activeOutput: activeOutput,
+            devices: devices,
+            profiles: settings.profiles,
+            paused: settings.paused,
+            runningBundleIDs: RunningApps.bundleIDs(),
+            callAppsOnly: settings.callAppsOnly,
+            callApps: settings.callApps)
+        var routing = false
+        if case .setInput = decision { routing = true }
+        let met = meetingActive
+        let since = meetingStartedAt
+        let paused = settings.paused
+        MainActor.assumeIsolated {
+            model.refresh(
+                devices: devices,
+                activeOutputName: outName,
+                activeInputName: inName,
+                activeInputSampleRateKHz: kHz,
+                routingActive: routing,
+                meetingActive: met,
+                meetingSince: since)
+            statusItemController.updateIcon(meeting: met, routing: routing, paused: paused)
+        }
     }
 
     // MARK: - Meeting Coordinator
@@ -151,7 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.recordReminderEnabled {
             postRecordReminder()
         }
-        menuController.updateMeeting(active: true, since: meetingStartedAt)
+        pushState()
         appLog.info("meeting started")
     }
 
@@ -164,7 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             didPauseMusic = false
         }
 
-        menuController.updateMeeting(active: false, since: nil)
+        pushState()
         appLog.info("meeting ended")
     }
 
