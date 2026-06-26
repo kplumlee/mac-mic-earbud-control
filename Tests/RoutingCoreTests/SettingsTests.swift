@@ -122,4 +122,60 @@ final class SettingsTests: XCTestCase {
         s.recordReminderEnabled = true
         XCTAssertTrue(s.recordReminderEnabled)
     }
+
+    // MARK: - Output switching, mute hotkey, calendar settings
+
+    func testOutputMuteCalendarDefaultsWhenUnset() {
+        let s = freshSettings()
+        XCTAssertTrue(s.autoSwitchOutputToBluetooth)
+        XCTAssertNil(s.preferredOutputName)
+        XCTAssertTrue(s.muteHotkeyEnabled)
+        XCTAssertFalse(s.calendarPrelaunchEnabled)
+        XCTAssertEqual(s.calendarLeadMinutes, 1)
+    }
+
+    func testAutoSwitchOutputToBluetoothRoundTrip() {
+        let s = freshSettings()
+        XCTAssertTrue(s.autoSwitchOutputToBluetooth)
+        s.autoSwitchOutputToBluetooth = false
+        XCTAssertFalse(s.autoSwitchOutputToBluetooth)
+        s.autoSwitchOutputToBluetooth = true
+        XCTAssertTrue(s.autoSwitchOutputToBluetooth)
+    }
+
+    func testPreferredOutputNameRoundTrip() {
+        let s = freshSettings()
+        XCTAssertNil(s.preferredOutputName)
+        s.preferredOutputName = "AirPods Pro"
+        XCTAssertEqual(s.preferredOutputName, "AirPods Pro")
+        s.preferredOutputName = nil
+        XCTAssertNil(s.preferredOutputName)
+    }
+
+    func testMuteHotkeyEnabledRoundTrip() {
+        let s = freshSettings()
+        XCTAssertTrue(s.muteHotkeyEnabled)
+        s.muteHotkeyEnabled = false
+        XCTAssertFalse(s.muteHotkeyEnabled)
+        s.muteHotkeyEnabled = true
+        XCTAssertTrue(s.muteHotkeyEnabled)
+    }
+
+    func testCalendarPrelaunchEnabledRoundTrip() {
+        let s = freshSettings()
+        XCTAssertFalse(s.calendarPrelaunchEnabled)
+        s.calendarPrelaunchEnabled = true
+        XCTAssertTrue(s.calendarPrelaunchEnabled)
+        s.calendarPrelaunchEnabled = false
+        XCTAssertFalse(s.calendarPrelaunchEnabled)
+    }
+
+    func testCalendarLeadMinutesRoundTrip() {
+        let s = freshSettings()
+        XCTAssertEqual(s.calendarLeadMinutes, 1)
+        s.calendarLeadMinutes = 5
+        XCTAssertEqual(s.calendarLeadMinutes, 5)
+        s.calendarLeadMinutes = 0
+        XCTAssertEqual(s.calendarLeadMinutes, 0)
+    }
 }

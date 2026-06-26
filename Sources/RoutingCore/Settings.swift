@@ -12,6 +12,11 @@ public final class Settings {
         static let launchAppsOnMeeting = "launchAppsOnMeeting"
         static let pauseMusicOnMeeting = "pauseMusicOnMeeting"
         static let recordReminderEnabled = "recordReminderEnabled"
+        static let autoSwitchOutputToBluetooth = "autoSwitchOutputToBluetooth"
+        static let preferredOutputName = "preferredOutputName"
+        static let muteHotkeyEnabled = "muteHotkeyEnabled"
+        static let calendarPrelaunchEnabled = "calendarPrelaunchEnabled"
+        static let calendarLeadMinutes = "calendarLeadMinutes"
     }
 
     public static let defaultPriority: [String] = []
@@ -86,5 +91,36 @@ public final class Settings {
     public var recordReminderEnabled: Bool {
         get { defaults.object(forKey: Key.recordReminderEnabled) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.recordReminderEnabled) }
+    }
+
+    public var autoSwitchOutputToBluetooth: Bool {
+        get { defaults.object(forKey: Key.autoSwitchOutputToBluetooth) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.autoSwitchOutputToBluetooth) }
+    }
+
+    public var preferredOutputName: String? {
+        get { defaults.string(forKey: Key.preferredOutputName) }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: Key.preferredOutputName)
+            } else {
+                defaults.removeObject(forKey: Key.preferredOutputName)
+            }
+        }
+    }
+
+    public var muteHotkeyEnabled: Bool {
+        get { defaults.object(forKey: Key.muteHotkeyEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.muteHotkeyEnabled) }
+    }
+
+    public var calendarPrelaunchEnabled: Bool {
+        get { defaults.bool(forKey: Key.calendarPrelaunchEnabled) }
+        set { defaults.set(newValue, forKey: Key.calendarPrelaunchEnabled) }
+    }
+
+    public var calendarLeadMinutes: Int {
+        get { defaults.object(forKey: Key.calendarLeadMinutes) as? Int ?? 1 }
+        set { defaults.set(newValue, forKey: Key.calendarLeadMinutes) }
     }
 }
