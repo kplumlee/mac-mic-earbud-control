@@ -148,6 +148,12 @@ final class AppModel: ObservableObject {
         onChange()
     }
 
+    /// Returns the name of the mic that would be auto-selected for a Bluetooth
+    /// device whose output name is `outputName`. Returns nil if no candidate exists.
+    func autoMicName(excludingOutput outputName: String?) -> String? {
+        RoutingPolicy.bestAutoMic(devices: devices, excludingOutput: outputName ?? "")?.name
+    }
+
     /// Input device names not already in the given device's priority list.
     func addableInputs(for name: String) -> [String] {
         let current = Set(micPriority(for: name))

@@ -359,15 +359,19 @@ private struct MicPriorityEditor: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 
-            VStack(spacing: 2) {
-                ForEach(Array(mics.enumerated()), id: \.element) { index, mic in
-                    MicPriorityRow(
-                        model: model,
-                        deviceName: deviceName,
-                        mic: mic,
-                        index: index,
-                        total: mics.count
-                    )
+            if mics.isEmpty {
+                AutoMicRow(autoName: model.autoMicName(excludingOutput: deviceName))
+            } else {
+                VStack(spacing: 2) {
+                    ForEach(Array(mics.enumerated()), id: \.element) { index, mic in
+                        MicPriorityRow(
+                            model: model,
+                            deviceName: deviceName,
+                            mic: mic,
+                            index: index,
+                            total: mics.count
+                        )
+                    }
                 }
             }
 
@@ -390,6 +394,31 @@ private struct MicPriorityEditor: View {
         .padding(8)
         .background(Color.primary.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+private struct AutoMicRow: View {
+    let autoName: String?
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "wand.and.stars")
+                .font(.caption)
+                .foregroundStyle(Color.accentColor)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Auto \u{2014} best built-in/USB mic")
+                    .font(.caption)
+                if let autoName {
+                    Text(autoName)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 3)
     }
 }
 
@@ -796,10 +825,14 @@ private struct CalendarSection: View {
         }
     }
 
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f
+    }()
+
     private func relativeTime(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: .now)
+        Self.relativeFormatter.localizedString(for: date, relativeTo: .now)
     }
 }
 

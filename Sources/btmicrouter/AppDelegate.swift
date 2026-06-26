@@ -59,7 +59,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         previousDevices = manager.allDevices()
         updateMuteHotKeyRegistration()
         apply()
-        requestCalendarAccessIfNeeded()
 
         meetingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.evaluateMeeting()
