@@ -11,7 +11,7 @@ struct PopoverView: View {
             VStack(spacing: 10) {
                 StatusHeader(model: model)
 
-                if model.meetingActive && model.recordReminderEnabled {
+                if model.meetingActive && model.recordReminderEnabled && !model.recordReminderDismissed {
                     RecordingReminderBanner(model: model)
                 }
 
@@ -135,12 +135,14 @@ private struct StatusHeader: View {
                     .buttonStyle(.bordered)
                     .controlSize(.small)
 
-                    Button("Fix now") {
-                        model.fixNow()
+                    if model.routingActive || model.meetingActive {
+                        Button("Fix now") {
+                            model.fixNow()
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                        .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .foregroundStyle(.secondary)
                 }
             }
         }
@@ -188,7 +190,7 @@ private struct StatusHeader: View {
             TimelineView(.periodic(from: .now, by: 1)) { _ in
                 Text(elapsedString(since: model.meetingSince))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
                     .monospacedDigit()
             }
         } else if model.routingActive {
@@ -219,7 +221,7 @@ private struct RecordingReminderBanner: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "record.circle")
+            Image(systemName: "record.circle.fill")
                 .font(.title3)
                 .foregroundStyle(.red)
                 .symbolRenderingMode(.hierarchical)
@@ -236,6 +238,12 @@ private struct RecordingReminderBanner: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .tint(.red)
+
+            Button("Got it") {
+                model.dismissRecordReminder()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
         .padding(14)
         .frame(maxWidth: .infinity)
@@ -447,7 +455,7 @@ private struct MicPriorityRow: View {
                 .buttonStyle(.borderless)
             }
         }
-        .padding(.vertical, 1)
+        .padding(.vertical, 3)
     }
 }
 
@@ -623,7 +631,7 @@ private struct CallAppsSection: View {
                                     .foregroundStyle(.secondary)
                                     .frame(width: 20)
 
-                                Text(app)
+                                Text(model.displayName(forBundleID: app))
                                     .font(.subheadline)
                                     .lineLimit(1)
 
@@ -691,9 +699,9 @@ private struct FooterSection: View {
 
                     Spacer()
 
-                    Text("Bluetooth Mic Router")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                    Text("Bluetooth Mic Router \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 6)
             }

@@ -17,6 +17,7 @@ final class AppModel: ObservableObject {
     @Published var meetingActive = false
     @Published var meetingSince: Date?
     @Published var loginEnabled = false
+    @Published var recordReminderDismissed = false
 
     // MARK: - Dependencies
 
@@ -50,6 +51,10 @@ final class AppModel: ObservableObject {
         self.activeInputName = activeInputName
         self.activeInputSampleRateKHz = activeInputSampleRateKHz
         self.routingActive = routingActive
+        // Reset dismiss flag each time a new meeting starts (inactive → active).
+        if meetingActive && !self.meetingActive {
+            recordReminderDismissed = false
+        }
         self.meetingActive = meetingActive
         self.meetingSince = meetingSince
         self.paused = settings.paused
@@ -213,6 +218,23 @@ final class AppModel: ObservableObject {
         LoginItem.setEnabled(!LoginItem.isEnabled)
         loginEnabled = LoginItem.isEnabled
         onChange()
+    }
+
+    func dismissRecordReminder() {
+        recordReminderDismissed = true
+    }
+
+    // MARK: - Display helpers
+
+    /// Returns a human-readable application name for the given bundle ID.
+    /// Resolves via NSWorkspace → FileManager displayName; falls back to the raw ID.
+    func displayName(forBundleID id: String) -> String {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: id) else {
+            return id
+        }
+        let raw = FileManager.default.displayName(atPath: url.path)
+        // Strip the ".app" suffix that displayName sometimes returns.
+        return raw.hasSuffix(".app") ? String(raw.dropLast(4)) : raw
     }
 
     func openGranola() {
