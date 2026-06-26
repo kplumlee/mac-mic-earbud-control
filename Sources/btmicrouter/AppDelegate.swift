@@ -143,8 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         if settings.pauseMusicOnMeeting {
-            setMusicPlaying(false)
-            didPauseMusic = true
+            didPauseMusic = setMusicPlaying(false)
         }
 
         postMeetingNotification(launched: settings.launchAppsOnMeeting)
@@ -176,18 +175,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func setMusicPlaying(_ playing: Bool) {
+    @discardableResult
+    private func setMusicPlaying(_ playing: Bool) -> Bool {
         let verb = playing ? "play" : "pause"
         let apps: [(bundleID: String, appName: String)] = [
             ("com.spotify.client", "Spotify"),
             ("com.apple.Music", "Music")
         ]
         let running = RunningApps.bundleIDs()
+        var dispatched = false
         for (bundleID, appName) in apps {
             guard running.contains(bundleID) else { continue }
             let source = "tell application \"\(appName)\" to \(verb)"
             NSAppleScript(source: source)?.executeAndReturnError(nil)
+            dispatched = true
         }
+        return dispatched
     }
 
     private func postMeetingNotification(launched: [String]) {

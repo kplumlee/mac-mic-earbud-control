@@ -187,7 +187,7 @@ final class StatusMenuController: NSObject {
         // Meeting automation section
         menu.addItem(disabledItem("Meeting automation"))
 
-        let meetingAutoItem = NSMenuItem(title: "Meeting automation",
+        let meetingAutoItem = NSMenuItem(title: "Enable meeting automation",
                                          action: #selector(toggleMeetingAutomation), keyEquivalent: "")
         meetingAutoItem.target = self
         meetingAutoItem.state = settings.meetingAutomationEnabled ? .on : .off
@@ -206,7 +206,9 @@ final class StatusMenuController: NSObject {
             launchSubMenu.addItem(removeItem)
         }
 
-        launchSubMenu.addItem(.separator())
+        if !settings.launchAppsOnMeeting.isEmpty {
+            launchSubMenu.addItem(.separator())
+        }
 
         // "Add running app" sub-submenu
         let addRunningParent = NSMenuItem(title: "Add running app", action: nil, keyEquivalent: "")
