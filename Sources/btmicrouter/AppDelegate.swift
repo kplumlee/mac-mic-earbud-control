@@ -11,6 +11,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuController: StatusMenuController!
     private var debounceItem: DispatchWorkItem?
 
+    // Meeting coordinator state
+    private var meetingTimer: Timer?
+    private var meetingActive = false
+    private var meetingStartedAt: Date?
+    private var didPauseMusic = false
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         menuController = StatusMenuController(
             settings: settings,
@@ -30,9 +36,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil)
         setupNotifications()
         apply()
+
+        meetingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            self?.evaluateMeeting()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        meetingTimer?.invalidate()
         manager.stopListening()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
@@ -106,5 +117,94 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         menuController.refreshMenu(devices: devices)
+    }
+
+    // MARK: - Meeting Coordinator
+
+    private func evaluateMeeting() {
+        let active = settings.meetingAutomationEnabled
+            && MeetingPolicy.isMeetingActive(
+                runningBundleIDs: RunningApps.bundleIDs(),
+                meetingApps: settings.callApps,
+                micInUse: manager.isDefaultInputInUse())
+        if active && !meetingActive {
+            meetingDidStart()
+        } else if !active && meetingActive {
+            meetingDidEnd()
+        }
+    }
+
+    private func meetingDidStart() {
+        meetingActive = true
+        meetingStartedAt = Date()
+
+        for name in settings.launchAppsOnMeeting {
+            launchApp(name)
+        }
+
+        if settings.pauseMusicOnMeeting {
+            setMusicPlaying(false)
+            didPauseMusic = true
+        }
+
+        postMeetingNotification(launched: settings.launchAppsOnMeeting)
+        menuController.updateMeeting(active: true, since: meetingStartedAt)
+        appLog.info("meeting started")
+    }
+
+    private func meetingDidEnd() {
+        meetingActive = false
+        meetingStartedAt = nil
+
+        if didPauseMusic {
+            setMusicPlaying(true)
+            didPauseMusic = false
+        }
+
+        menuController.updateMeeting(active: false, since: nil)
+        appLog.info("meeting ended")
+    }
+
+    private func launchApp(_ name: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        process.arguments = ["-g", "-a", name]
+        do {
+            try process.run()
+        } catch {
+            appLog.error("launchApp failed for \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func setMusicPlaying(_ playing: Bool) {
+        let verb = playing ? "play" : "pause"
+        let apps: [(bundleID: String, appName: String)] = [
+            ("com.spotify.client", "Spotify"),
+            ("com.apple.Music", "Music")
+        ]
+        let running = RunningApps.bundleIDs()
+        for (bundleID, appName) in apps {
+            guard running.contains(bundleID) else { continue }
+            let source = "tell application \"\(appName)\" to \(verb)"
+            NSAppleScript(source: source)?.executeAndReturnError(nil)
+        }
+    }
+
+    private func postMeetingNotification(launched: [String]) {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Meeting detected"
+        content.body = launched.isEmpty
+            ? "In a meeting"
+            : "Launched \(launched.joined(separator: ", "))"
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil)
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                appLog.error("meeting notification error: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 }
