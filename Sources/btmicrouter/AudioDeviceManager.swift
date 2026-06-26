@@ -92,6 +92,20 @@ final class AudioDeviceManager {
         return Int(size) / MemoryLayout<AudioStreamID>.size
     }
 
+    // MARK: - Device properties
+
+    func nominalSampleRate(for id: DeviceID) -> Double? {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var value: Float64 = 0
+        var size = UInt32(MemoryLayout<Float64>.size)
+        let status = AudioObjectGetPropertyData(AudioDeviceID(id), &addr, 0, nil, &size, &value)
+        guard status == noErr else { return nil }
+        return Double(value)
+    }
+
     // MARK: - Writing
 
     @discardableResult
